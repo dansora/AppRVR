@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Page } from './types';
 import Onboarding from './components/Onboarding';
 import BottomNav from './components/BottomNav';
@@ -8,95 +8,223 @@ import NewsFeed from './components/NewsFeed';
 import UploadContent from './components/UploadContent';
 import Polls from './components/Polls';
 import SettingsPage from './components/FeedbackForm';
-import AuthPage from './components/AuthPage';
+import SportPage from './components/SportPage';
 import WeatherPage from './components/WeatherPage';
 import { useSettings } from './contexts/SettingsContext';
+import ScrollToTopButton from './components/ScrollToTopButton';
+import AuthModal from './components/AuthModal';
+import { UserIcon, FlagUkIcon, FlagRoIcon, SettingsIcon } from './components/Icons';
 import { useLanguage } from './contexts/LanguageContext';
-import { FlagUkIcon, FlagRoIcon, UserIcon } from './components/Icons';
+import TermsModal from './components/TermsModal';
+import StickyRadioPlayer from './components/StickyRadioPlayer';
+import { supabase } from './services/supabaseClient';
+import type { Session } from '@supabase/supabase-js';
+import ProfilePage from './components/ProfilePage';
 
-const RVRLogo = () => (
-  <img src="https://storage.googleapis.com/aistudio-hosting/44422b8214f44043/versions/3a232c44365b2639/app/assets/image.png" alt="RVR Logo" className="h-12" />
-);
-
+type ConsentStatus = 'pending' | 'accepted' | 'declined';
 
 const App: React.FC = () => {
   const [showOnboarding, setShowOnboarding] = useState(true);
   const [activePage, setActivePage] = useState<Page>(Page.Home);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [username, setUsername] = useState('Guest');
   const { fontSize } = useSettings();
-  const { language, setLanguage } = useLanguage();
+  const [session, setSession] = useState<Session | null>(null);
+  const [isAuthModalOpen, setAuthModalOpen] = useState(false);
+  const { t, language, setLanguage } = useLanguage();
+
+  const [consentStatus, setConsentStatus] = useState<ConsentStatus>('pending');
+  const [isConsentModalOpen, setIsConsentModalOpen] = useState(false);
+  const [isUserMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const timer = setTimeout(() => setShowOnboarding(false), 2000); // Onboarding for 2 seconds
-    return () => clearTimeout(timer);
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const getFontSizeClass = () => {
-    switch (fontSize) {
-      case 'small': return 'text-sm';
-      case 'large': return 'text-lg';
-      default: return 'text-base';
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowOnboarding(false);
+    }, 2500);
+
+    const storedConsent = localStorage.getItem('rvr-terms-consent') as ConsentStatus | null;
+    if (storedConsent) {
+      setConsentStatus(storedConsent);
+    } else {
+      setConsentStatus('pending');
+      // Only show the modal after onboarding is done
+      if (!showOnboarding) {
+        setIsConsentModalOpen(true);
+      }
     }
+
+    return () => clearTimeout(timer);
+  }, [showOnboarding]);
+  
+  useEffect(() => {
+    if (!showOnboarding && consentStatus === 'pending') {
+      setIsConsentModalOpen(true);
+    }
+  }, [showOnboarding, consentStatus]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+        if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+            setUserMenuOpen(false);
+        }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [userMenuRef]);
+
+  const handleAcceptTerms = () => {
+    localStorage.setItem('rvr-terms-consent', 'accepted');
+    setConsentStatus('accepted');
+    setIsConsentModalOpen(false);
+    setActivePage(Page.Home);
   };
 
+  const handleDeclineTerms = () => {
+    localStorage.setItem('rvr-terms-consent', 'declined');
+    setConsentStatus('declined');
+    setIsConsentModalOpen(false);
+    setActivePage(Page.Radio);
+  };
+  
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setUserMenuOpen(false);
+    setActivePage(Page.Home);
+  }
+  
+  const getUsername = () => {
+      if (!session) return '';
+      return session.user.user_metadata?.username || session.user.email?.split('@')[0] || 'User';
+  }
+
+  const RestrictedModeBanner = () => (
+    <div className="bg-yellow-500 text-black text-center p-2 text-sm font-semibold">
+      {t('restrictedAccessMessage')}{' '}
+      <button onClick={() => setActivePage(Page.Settings)} className="underline font-bold">
+        {t('navSettings')}
+      </button>
+    </div>
+  );
+
   const renderPage = () => {
+    const isLoggedIn = !!session;
+    // If access is restricted, only allow Radio and Settings pages
+    if (consentStatus === 'declined' && activePage !== Page.Settings) {
+        return <RadioPlayer setActivePage={setActivePage} />;
+    }
+
     switch (activePage) {
       case Page.Home:
-        return <HomePage setActivePage={setActivePage} isLoggedIn={isLoggedIn} username={username} />;
+        return <HomePage setActivePage={setActivePage} isLoggedIn={isLoggedIn} username={getUsername()} />;
       case Page.Radio:
         return <RadioPlayer setActivePage={setActivePage} />;
       case Page.News:
-        return <NewsFeed category='news' />;
+        return <NewsFeed setActivePage={setActivePage} />;
       case Page.Sport:
-          return <NewsFeed category='sport' />;
+        return <SportPage setActivePage={setActivePage} />;
+      case Page.Weather:
+        return <WeatherPage setActivePage={setActivePage} />;
       case Page.Upload:
-        return <UploadContent isLoggedIn={isLoggedIn} setActivePage={setActivePage} />;
+        return <UploadContent />;
       case Page.Polls:
         return <Polls />;
       case Page.Settings:
-        return <SettingsPage />;
-      case Page.Login:
-        return <AuthPage setIsLoggedIn={(status) => {
-            setIsLoggedIn(status);
-            if (status) setUsername("Demo User");
-            else setUsername("Guest");
-        }} setActivePage={setActivePage} />;
-      case Page.Weather:
-        return <WeatherPage setActivePage={setActivePage} />;
+        return <SettingsPage onReviewTerms={() => setIsConsentModalOpen(true)} isLoggedIn={isLoggedIn} />;
+      case Page.Profile:
+        return <ProfilePage setActivePage={setActivePage} />;
       default:
-        return <HomePage setActivePage={setActivePage} isLoggedIn={isLoggedIn} username={username} />;
+        return <HomePage setActivePage={setActivePage} isLoggedIn={isLoggedIn} username={getUsername()} />;
     }
   };
+  
+  const getFontSizeClass = () => {
+    switch(fontSize) {
+      case 'small': return 'text-sm';
+      case 'large': return 'text-lg';
+      case 'medium':
+      default:
+        return 'text-base';
+    }
+  }
 
   if (showOnboarding) {
     return <Onboarding />;
   }
 
-  const pagesWithoutNav = [Page.Login, Page.Radio, Page.Weather];
-  const pagesWithoutHeader = [Page.Login, Page.Radio, Page.Weather];
-
   return (
     <div className={`bg-marine-blue min-h-screen ${getFontSizeClass()}`}>
-       {!pagesWithoutHeader.includes(activePage) && (
-         <header className="sticky top-0 z-40 bg-gradient-to-r from-marine-blue-darker to-marine-blue-darkest p-4 flex justify-between items-center text-white shadow-lg">
-            <RVRLogo />
-            <div className="flex items-center space-x-4">
-                <button onClick={() => setLanguage(language === 'en' ? 'ro' : 'en')} className="focus:outline-none">
-                    {language === 'en' ? <FlagRoIcon className="w-8 h-8 rounded-full" /> : <FlagUkIcon className="w-8 h-8 rounded-full" />}
+        <header className="sticky top-0 z-40 bg-marine-blue-darkest/80 backdrop-blur-sm shadow-md p-3 flex items-center justify-between">
+            <div className="flex items-center">
+              <span className="text-2xl font-bold text-golden-yellow font-montserrat">RVR</span>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <button onClick={() => setLanguage('en')} className={`p-1 rounded-full ${language === 'en' ? 'bg-golden-yellow' : ''}`}>
+                  <FlagUkIcon className="w-6 h-6"/>
                 </button>
-                <button onClick={() => setActivePage(Page.Login)}>
-                    <UserIcon className="w-8 h-8 text-golden-yellow" />
+                <button onClick={() => setLanguage('ro')} className={`p-1 rounded-full ${language === 'ro' ? 'bg-golden-yellow' : ''}`}>
+                  <FlagRoIcon className="w-6 h-6"/>
                 </button>
+              </div>
+
+              {session ? (
+                  <div className="relative" ref={userMenuRef}>
+                    <button onClick={() => setUserMenuOpen(!isUserMenuOpen)} className="flex items-center gap-2 text-white cursor-pointer">
+                      <UserIcon className="w-6 h-6" />
+                      <span className="hidden sm:inline">{t('authLoggedInAs', { username: getUsername() })}</span>
+                    </button>
+                    {isUserMenuOpen && (
+                        <div className="absolute right-0 mt-2 w-48 bg-marine-blue-darker rounded-md shadow-lg py-1 z-50">
+                            <button
+                              onClick={handleLogout}
+                              className="block w-full text-left px-4 py-2 text-sm text-white hover:bg-marine-blue-darkest"
+                            >
+                              {t('authLogout')}
+                            </button>
+                        </div>
+                    )}
+                  </div>
+              ) : (
+                <button onClick={() => setAuthModalOpen(true)} className="flex items-center gap-2 text-white">
+                  <UserIcon className="w-6 h-6" />
+                  <span className="hidden sm:inline">{t('navLogin')}</span>
+                </button>
+              )}
+               <button onClick={() => setActivePage(Page.Settings)} className="text-white">
+                  <SettingsIcon className="w-6 h-6" />
+               </button>
             </div>
         </header>
-       )}
-      <main className="pb-16">
-        {renderPage()}
-      </main>
-      {!pagesWithoutNav.includes(activePage) && (
-        <BottomNav activePage={activePage} setActivePage={setActivePage} />
-      )}
+
+        {consentStatus === 'declined' && <RestrictedModeBanner />}
+        
+        <main className="pb-32">
+            {renderPage()}
+        </main>
+
+        <ScrollToTopButton />
+
+        {consentStatus === 'accepted' && activePage !== Page.Radio && <StickyRadioPlayer setActivePage={setActivePage} />}
+        {consentStatus === 'accepted' && <BottomNav activePage={activePage} setActivePage={setActivePage} isLoggedIn={!!session} />}
+        
+        {isAuthModalOpen && <AuthModal onClose={() => setAuthModalOpen(false)} />}
+        
+        {isConsentModalOpen && <TermsModal mode="consent" onAccept={handleAcceptTerms} onDecline={handleDeclineTerms} />}
     </div>
   );
 };

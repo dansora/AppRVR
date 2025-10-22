@@ -4,15 +4,15 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { Page } from '../types';
 import { RefreshIcon } from './Icons';
 
-interface NewsFeedProps {
+interface SportPageProps {
   setActivePage: (page: Page) => void;
 }
 
-const NEWS_FEED_URL = "https://www.digi24.ro/rss";
+const SPORT_FEED_URL = "https://www.digisport.ro/rss";
 const REFRESH_THRESHOLD = 80; // pixels
 
-const NewsFeed: React.FC<NewsFeedProps> = ({ setActivePage }) => {
-  const { items, loading, error, refetch } = useRssFeed(NEWS_FEED_URL, 10);
+const SportPage: React.FC<SportPageProps> = ({ setActivePage }) => {
+  const { items, loading, error, refetch } = useRssFeed(SPORT_FEED_URL, 10);
   const { t } = useLanguage();
 
   const [touchStartY, setTouchStartY] = useState(0);
@@ -46,7 +46,7 @@ const NewsFeed: React.FC<NewsFeedProps> = ({ setActivePage }) => {
     setTouchStartY(0);
     setPullDistance(0);
   };
-  
+
   const formatDate = (dateString: string) => {
     try {
       const date = new Date(dateString);
@@ -117,11 +117,11 @@ const NewsFeed: React.FC<NewsFeedProps> = ({ setActivePage }) => {
         
         <div style={{ transform: `translateY(${pullDistance}px)` }} className="transition-transform">
             <div className="flex justify-between items-center mb-4">
-                <h1 className="text-3xl font-montserrat text-golden-yellow">{t('navNews')}</h1>
+                <h1 className="text-3xl font-montserrat text-golden-yellow">{t('navSport')}</h1>
             </div>
-             <div className="flex gap-4 mb-6">
-                <button onClick={() => setActivePage(Page.Sport)} className="flex-1 bg-marine-blue-darker text-white px-4 py-2 rounded-full text-sm font-bold hover:bg-marine-blue-darkest transition-colors">
-                    {t('navSport')}
+            <div className="flex gap-4 mb-6">
+                <button onClick={() => setActivePage(Page.News)} className="flex-1 bg-marine-blue-darker text-white px-4 py-2 rounded-full text-sm font-bold hover:bg-marine-blue-darkest transition-colors">
+                    {t('navNews')}
                 </button>
                 <button onClick={() => setActivePage(Page.Weather)} className="flex-1 bg-marine-blue-darker text-white px-4 py-2 rounded-full text-sm font-bold hover:bg-marine-blue-darkest transition-colors">
                     {t('homeWeatherTitle')}
@@ -133,4 +133,4 @@ const NewsFeed: React.FC<NewsFeedProps> = ({ setActivePage }) => {
   );
 };
 
-export default NewsFeed;
+export default SportPage;

@@ -25,30 +25,53 @@ export const AudioProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setTrackTitle(t('radioLiveBroadcast'));
   }, [t]);
 
-  useEffect(() => {
-    if (!audioRef.current) {
-        audioRef.current = new Audio(STREAM_URL);
-        audioRef.current.volume = volume;
-    }
-  }, [volume]);
-
   const togglePlay = () => {
-    if (audioRef.current) {
-      if (isPlaying) {
-        audioRef.current.pause();
-      } else {
-        audioRef.current.play().catch(e => console.error("Error playing audio:", e));
+    if (!audioRef.current) {
+      // Lazy-initialize inside the user gesture. Correct for autoplay policies.
+      // Create audio element without a source initially.
+      audioRef.current = new Audio();
+      audioRef.current.volume = volume;
+    }
+    const audio = audioRef.current;
+
+    if (isPlaying) {
+      audio.pause();
+      audio.src = ''; // Detach from stream to save bandwidth and ensure a clean reconnect.
+      setIsPlaying(false);
+    } else {
+      audio.src = STREAM_URL;
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            setIsPlaying(true);
+          })
+          .catch(error => {
+            console.error("Audio playback failed:", error);
+            setIsPlaying(false);
+          });
       }
-      setIsPlaying(!isPlaying);
     }
   };
 
+
   const setVolume = (newVolume: number) => {
+    setVolumeState(newVolume);
     if (audioRef.current) {
       audioRef.current.volume = newVolume;
     }
-    setVolumeState(newVolume);
   };
+
+  // Cleanup audio element on unmount
+  useEffect(() => {
+      const audio = audioRef.current;
+      return () => {
+          if (audio) {
+              audio.pause();
+              audio.src = '';
+          }
+      };
+  }, []);
 
   return (
     <AudioContext.Provider value={{ isPlaying, togglePlay, volume, setVolume, trackTitle }}>

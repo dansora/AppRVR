@@ -1,73 +1,103 @@
-import React from 'react';
-import { Page } from '../types';
+import React, { useState } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { UploadIcon } from './Icons';
 
-interface UploadContentProps {
-  isLoggedIn: boolean;
-  setActivePage: (page: Page) => void;
-}
-
-const UploadContent: React.FC<UploadContentProps> = ({ isLoggedIn, setActivePage }) => {
+const UploadContent: React.FC = () => {
   const { t } = useLanguage();
-  if (!isLoggedIn) {
-    return (
-      <div className="p-4 text-white text-center h-full flex flex-col justify-center items-center">
-        <h2 className="text-2xl font-montserrat mb-4 text-golden-yellow">{t('uploadLoginPrompt')}</h2>
-        <p className="mb-6 text-white/80">{t('uploadLoginMessage')}</p>
-        <button
-          onClick={() => setActivePage(Page.Login)}
-          className="bg-golden-yellow text-marine-blue font-bold py-2 px-6 rounded-full hover:bg-yellow-400 transition-colors"
-        >
-          {t('uploadLoginButton')}
-        </button>
-      </div>
-    );
-  }
+  const [fileName, setFileName] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState<'success' | 'error' | null>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setFileName(e.target.files[0].name);
+    } else {
+      setFileName('');
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setSubmitStatus(null);
+
+    // Mock submission
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    // Simulate success/error
+    if (Math.random() > 0.2) {
+      setSubmitStatus('success');
+    } else {
+      setSubmitStatus('error');
+    }
+
+    setIsSubmitting(false);
+  };
 
   return (
-    <div className="p-4 text-white font-roboto">
-      <h1 className="text-3xl font-montserrat text-golden-yellow mb-6">{t('uploadTitle')}</h1>
-      <form className="space-y-6">
-        <div>
-          <label htmlFor="file-upload" className="block text-sm font-medium text-white/80 mb-2">
-            {t('uploadFileLabel')}
-          </label>
-          <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-white/30 border-dashed rounded-md">
-            <div className="space-y-1 text-center">
-              <svg className="mx-auto h-12 w-12 text-white/50" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
-                <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              <div className="flex text-sm text-white/60">
-                <label htmlFor="file-input" className="relative cursor-pointer bg-marine-blue-darker rounded-md font-medium text-golden-yellow hover:text-yellow-400 focus-within:outline-none px-1">
-                  <span>{t('uploadFilePrompt')}</span>
-                  <input id="file-input" name="file-input" type="file" className="sr-only" />
-                </label>
-                <p className="pl-1">{t('uploadFileDragDrop')}</p>
-              </div>
-              <p className="text-xs text-white/50">{t('uploadFileFormats')}</p>
-            </div>
+    <div className="p-4 text-white font-roboto pb-20">
+      <div className="text-center mb-6">
+        <h1 className="text-3xl font-montserrat text-golden-yellow">{t('uploadTitle')}</h1>
+        <p className="mt-2 text-white/80 max-w-2xl mx-auto">{t('uploadDesc')}</p>
+      </div>
+
+      <div className="max-w-xl mx-auto bg-marine-blue-darker p-6 rounded-lg shadow-md">
+        <h2 className="text-xl font-montserrat text-white mb-4 text-center">{t('uploadFormTitle')}</h2>
+        {submitStatus === 'success' ? (
+          <div className="text-center p-4 bg-green-500/20 text-green-300 rounded-md">
+            {t('uploadSuccess')}
           </div>
-        </div>
-        <div>
-          <label htmlFor="description" className="block text-sm font-medium text-white/80 mb-2">
-            {t('uploadDescriptionLabel')}
-          </label>
-          <textarea
-            id="description"
-            rows={4}
-            className="w-full bg-marine-blue-darker rounded-md p-2 text-white focus:ring-golden-yellow focus:border-golden-yellow border-transparent"
-            placeholder={t('uploadDescriptionPlaceholder')}
-          ></textarea>
-        </div>
-        <div>
-          <button
-            type="submit"
-            className="w-full bg-golden-yellow text-marine-blue font-bold py-3 px-4 rounded-full hover:bg-yellow-400 transition-colors"
-          >
-            {t('uploadSubmitButton')}
-          </button>
-        </div>
-      </form>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
+             {submitStatus === 'error' && (
+                <div className="text-center p-3 bg-red-500/20 text-red-300 rounded-md">
+                    {t('uploadError')}
+                </div>
+             )}
+            <div>
+              <label className="block text-sm font-medium text-white/80 mb-1">{t('uploadFormName')}</label>
+              <input type="text" name="name" required className="w-full bg-marine-blue-darkest/80 rounded-md p-2 text-white focus:ring-golden-yellow focus:border-golden-yellow border-transparent" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-white/80 mb-1">{t('uploadFormEmail')}</label>
+              <input type="email" name="email" required className="w-full bg-marine-blue-darkest/80 rounded-md p-2 text-white focus:ring-golden-yellow focus:border-golden-yellow border-transparent" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-white/80 mb-1">{t('uploadFormPhone')}</label>
+              <input type="tel" name="phone" className="w-full bg-marine-blue-darkest/80 rounded-md p-2 text-white focus:ring-golden-yellow focus:border-golden-yellow border-transparent" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-white/80 mb-1">{t('uploadFormMessage')}</label>
+              <textarea name="message" rows={5} required className="w-full bg-marine-blue-darkest/80 rounded-md p-2 text-white focus:ring-golden-yellow focus:border-golden-yellow border-transparent"></textarea>
+            </div>
+            <div>
+                <label className="block text-sm font-medium text-white/80 mb-1">{t('uploadFormFile')}</label>
+                <div className="relative">
+                    <input type="file" id="file-upload" className="absolute w-0 h-0 opacity-0" onChange={handleFileChange} />
+                    <label htmlFor="file-upload" className="cursor-pointer w-full flex justify-between items-center bg-marine-blue-darkest/80 rounded-md p-2 text-white/70 hover:bg-marine-blue-darkest">
+                        <span>{fileName || t('uploadFormFilePlaceholder')}</span>
+                        <UploadIcon className="w-5 h-5" />
+                    </label>
+                </div>
+            </div>
+            <div>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full mt-2 bg-golden-yellow text-marine-blue font-bold py-3 rounded-full hover:bg-yellow-400 transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed flex items-center justify-center"
+              >
+                {isSubmitting ? (
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                ) : null}
+                {t('uploadSubmit')}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
     </div>
   );
 };

@@ -26,7 +26,7 @@ const ContactModal: React.FC<ContactModalProps> = ({ onClose }) => {
     const body = encodeURIComponent(
       `Name: ${formData.firstName} ${formData.lastName}\nEmail: ${formData.email}\n\nMessage:\n${formData.message}`
     );
-    window.location.href = `mailto:secretariat@radiovocearomanilor.com?subject=${subject}&body=${body}`;
+    window.location.href = `mailto:office@radiovocearomanilor.com?subject=${subject}&body=${body}`;
     onClose();
   };
 

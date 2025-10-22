@@ -1,0 +1,32 @@
+{
+  "name": "Radio Vocea Românilor",
+  "short_name": "RVR",
+  "description": "A Progressive Web App (PWA) for an online radio station, offering live streaming, news, user content uploads, and interactive polls.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#003366",
+  "theme_color": "#003366",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/logo192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "related_applications": [
+    {
+      "platform": "play",
+      "url": "https://play.google.com/store/apps/details?id=com.rvr.app",
+      "id": "com.rvr.app"
+    }
+  ],
+  "prefer_related_applications": true
+}

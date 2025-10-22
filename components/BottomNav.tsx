@@ -1,12 +1,12 @@
 import React from 'react';
 import { Page } from '../types';
-// Fix: Removed unused RadioIcon import.
-import { HomeIcon, NewsIcon, UploadIcon, PollIcon, SettingsIcon } from './Icons';
+import { HomeIcon, NewsIcon, UploadIcon, PollIcon, UserIcon as ProfileIcon } from './Icons';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface BottomNavProps {
   activePage: Page;
   setActivePage: (page: Page) => void;
+  isLoggedIn: boolean;
 }
 
 const NavItem: React.FC<{
@@ -29,15 +29,21 @@ const NavItem: React.FC<{
   );
 };
 
-const BottomNav: React.FC<BottomNavProps> = ({ activePage, setActivePage }) => {
+const BottomNav: React.FC<BottomNavProps> = ({ activePage, setActivePage, isLoggedIn }) => {
   const { t } = useLanguage();
-  const navItems = [
+  
+  const baseNavItems = [
     { icon: HomeIcon, label: t('navHome'), page: Page.Home },
     { icon: NewsIcon, label: t('navNews'), page: Page.News },
     { icon: UploadIcon, label: t('navUpload'), page: Page.Upload },
     { icon: PollIcon, label: t('navPolls'), page: Page.Polls },
-    { icon: SettingsIcon, label: t('navSettings'), page: Page.Settings },
   ];
+  
+  const navItems = isLoggedIn
+    ? [...baseNavItems, { icon: ProfileIcon, label: t('profileNav'), page: Page.Profile }]
+    : baseNavItems;
+
+  const newsPages = [Page.News, Page.Sport, Page.Weather];
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 h-16 bg-gradient-to-r from-marine-blue-darker to-marine-blue-darkest border-t border-white/20 flex z-50">
@@ -47,7 +53,11 @@ const BottomNav: React.FC<BottomNavProps> = ({ activePage, setActivePage }) => {
           icon={item.icon}
           label={item.label}
           page={item.page}
-          isActive={activePage === item.page}
+          isActive={
+            item.page === Page.News 
+              ? newsPages.includes(activePage) 
+              : activePage === item.page
+          }
           onClick={() => setActivePage(item.page)}
         />
       ))}

@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { Page } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
-import { useAudio } from '../contexts/AudioContext';
-import { PlayIcon, PauseIcon, NewsIcon, SportIcon, WeatherIcon, ChevronRightIcon, FacebookIcon, WhatsAppIcon, YouTubeIcon, LinkedInIcon } from './Icons';
+import { NewsIcon, SportIcon, WeatherIcon, ChevronRightIcon, FacebookIcon, WhatsAppIcon, YouTubeIcon, LinkedInIcon, MailIcon, DonateIcon, StoreIcon } from './Icons';
 import ContactModal from './ContactModal';
+import DonationModal from './DonationModal';
 
 interface HomePageProps {
   setActivePage: (page: Page) => void;
@@ -13,8 +13,8 @@ interface HomePageProps {
 
 const HomePage: React.FC<HomePageProps> = ({ setActivePage, isLoggedIn, username }) => {
   const { t } = useLanguage();
-  const { isPlaying, togglePlay, trackTitle } = useAudio();
   const [isContactModalOpen, setContactModalOpen] = useState(false);
+  const [isDonationModalOpen, setDonationModalOpen] = useState(false);
 
   const quickLinks = [
     { page: Page.News, icon: NewsIcon, title: t('navNews') },
@@ -24,9 +24,9 @@ const HomePage: React.FC<HomePageProps> = ({ setActivePage, isLoggedIn, username
 
   const socialLinks = [
     { href: "https://www.facebook.com/groups/1331920294319593", icon: FacebookIcon },
-    { href: "https://wa.me/your-number", icon: WhatsAppIcon },
+    { href: "https://web.whatsapp.com/", icon: WhatsAppIcon },
     { href: "https://www.youtube.com/@radiovocearomanilor8992", icon: YouTubeIcon },
-    { href: "#", icon: LinkedInIcon },
+    { href: "https://www.linkedin.com/", icon: LinkedInIcon },
   ];
 
   return (
@@ -37,22 +37,7 @@ const HomePage: React.FC<HomePageProps> = ({ setActivePage, isLoggedIn, username
       </header>
 
       <div className="space-y-4">
-        <div 
-            onClick={() => setActivePage(Page.Radio)}
-            className="bg-marine-blue-darker p-4 rounded-lg flex items-center justify-between cursor-pointer hover:bg-marine-blue-darkest transition-colors shadow-md"
-        >
-            <div className="flex-1 mr-4">
-                <h3 className="font-bold text-lg text-white font-montserrat">{t('radioNowPlaying')}</h3>
-                <p className="text-golden-yellow truncate">{trackTitle}</p>
-            </div>
-            <button 
-                onClick={(e) => { e.stopPropagation(); togglePlay(); }} 
-                className="bg-golden-yellow text-marine-blue rounded-full p-3 hover:bg-yellow-400 transition-transform transform hover:scale-110"
-            >
-                {isPlaying ? <PauseIcon className="w-6 h-6"/> : <PlayIcon className="w-6 h-6"/>}
-            </button>
-        </div>
-
+        
         <h3 className="text-xl font-montserrat text-white pt-4">{t('homeQuickLinks')}</h3>
         <div className="space-y-3">
              {quickLinks.map(link => (
@@ -64,11 +49,28 @@ const HomePage: React.FC<HomePageProps> = ({ setActivePage, isLoggedIn, username
              ))}
         </div>
         
-        <div className="pt-6 text-center">
+        <div className="pt-6 flex flex-col sm:flex-row items-center justify-center gap-4">
+            <a
+                href="https://radio-vocea-romanilor-1.sumupstore.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full sm:w-auto bg-golden-yellow text-marine-blue font-bold py-3 px-8 rounded-full hover:bg-yellow-400 transition-colors duration-300 flex items-center justify-center gap-2"
+            >
+                <StoreIcon className="w-5 h-5" />
+                {t('homeRvrStore')}
+            </a>
+            <button
+                onClick={() => setDonationModalOpen(true)}
+                className="w-full sm:w-auto bg-golden-yellow text-marine-blue font-bold py-3 px-8 rounded-full hover:bg-yellow-400 transition-colors duration-300 flex items-center justify-center gap-2"
+            >
+                <DonateIcon className="w-5 h-5" />
+                {t('homeDonateButton')}
+            </button>
             <button 
                 onClick={() => setContactModalOpen(true)}
-                className="bg-golden-yellow text-marine-blue font-bold py-3 px-8 rounded-full hover:bg-yellow-400 transition-colors duration-300"
+                className="w-full sm:w-auto bg-golden-yellow text-marine-blue font-bold py-3 px-8 rounded-full hover:bg-yellow-400 transition-colors duration-300 flex items-center justify-center gap-2"
             >
+                <MailIcon className="w-5 h-5" />
                 {t('homeContact')}
             </button>
         </div>
@@ -87,6 +89,7 @@ const HomePage: React.FC<HomePageProps> = ({ setActivePage, isLoggedIn, username
       </div>
 
       {isContactModalOpen && <ContactModal onClose={() => setContactModalOpen(false)} />}
+      {isDonationModalOpen && <DonationModal onClose={() => setDonationModalOpen(false)} />}
     </div>
   );
 };
