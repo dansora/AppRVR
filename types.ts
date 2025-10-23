@@ -9,4 +9,7 @@ export enum Page {
   Weather = 'Weather',
   Sport = 'Sport',
   Profile = 'Profile',
+  Events = 'Events',
+  UsefulInfo = 'UsefulInfo',
+  Advertising = 'Advertising',
 }

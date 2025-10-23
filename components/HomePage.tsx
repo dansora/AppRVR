@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { Page } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
-import { NewsIcon, SportIcon, WeatherIcon, ChevronRightIcon, FacebookIcon, WhatsAppIcon, YouTubeIcon, LinkedInIcon, MailIcon, DonateIcon, StoreIcon } from './Icons';
+import { NewsIcon, SportIcon, WeatherIcon, ChevronRightIcon, FacebookIcon, WhatsAppIcon, YouTubeIcon, LinkedInIcon, MailIcon, DonateIcon, StoreIcon, EventsIcon, InfoIcon, AdvertisingIcon } from './Icons';
 import ContactModal from './ContactModal';
 import DonationModal from './DonationModal';
+import InfoModal from './InfoModal';
 
 interface HomePageProps {
   setActivePage: (page: Page) => void;
@@ -15,11 +16,17 @@ const HomePage: React.FC<HomePageProps> = ({ setActivePage, isLoggedIn, username
   const { t } = useLanguage();
   const [isContactModalOpen, setContactModalOpen] = useState(false);
   const [isDonationModalOpen, setDonationModalOpen] = useState(false);
+  const [isEventsModalOpen, setEventsModalOpen] = useState(false);
+  const [isInfoModalOpen, setInfoModalOpen] = useState(false);
+  const [isAdvertisingModalOpen, setAdvertisingModalOpen] = useState(false);
 
   const quickLinks = [
-    { page: Page.News, icon: NewsIcon, title: t('navNews') },
-    { page: Page.Sport, icon: SportIcon, title: t('navSport') },
-    { page: Page.Weather, icon: WeatherIcon, title: t('homeWeatherTitle') }
+    { key: Page.News, icon: NewsIcon, title: t('navNews'), action: () => setActivePage(Page.News) },
+    { key: Page.Sport, icon: SportIcon, title: t('navSport'), action: () => setActivePage(Page.Sport) },
+    { key: Page.Weather, icon: WeatherIcon, title: t('homeWeatherTitle'), action: () => setActivePage(Page.Weather) },
+    { key: Page.Events, icon: EventsIcon, title: t('navEvents'), action: () => setEventsModalOpen(true) },
+    { key: Page.UsefulInfo, icon: InfoIcon, title: t('navUsefulInfo'), action: () => setInfoModalOpen(true) },
+    { key: Page.Advertising, icon: AdvertisingIcon, title: t('navAdvertising'), action: () => setAdvertisingModalOpen(true) },
   ];
 
   const socialLinks = [
@@ -41,7 +48,7 @@ const HomePage: React.FC<HomePageProps> = ({ setActivePage, isLoggedIn, username
         <h3 className="text-xl font-montserrat text-white pt-4">{t('homeQuickLinks')}</h3>
         <div className="space-y-3">
              {quickLinks.map(link => (
-                 <button key={link.title} onClick={() => setActivePage(link.page)} className="w-full bg-marine-blue-darker p-4 rounded-lg flex items-center text-left hover:bg-marine-blue-darkest transition-colors shadow-md">
+                 <button key={link.key} onClick={link.action} className="w-full bg-marine-blue-darker p-4 rounded-lg flex items-center text-left hover:bg-marine-blue-darkest transition-colors shadow-md">
                      <link.icon className="w-6 h-6 text-golden-yellow mr-4" />
                      <span className="flex-1 font-bold text-white font-montserrat">{link.title}</span>
                      <ChevronRightIcon className="w-6 h-6 text-white/50" />
@@ -90,6 +97,9 @@ const HomePage: React.FC<HomePageProps> = ({ setActivePage, isLoggedIn, username
 
       {isContactModalOpen && <ContactModal onClose={() => setContactModalOpen(false)} />}
       {isDonationModalOpen && <DonationModal onClose={() => setDonationModalOpen(false)} />}
+      {isEventsModalOpen && <InfoModal title={t('navEvents')} url="https://radiovocearomanilor.com/wp/informatii-utile/evenimente-rvr/" onClose={() => setEventsModalOpen(false)} />}
+      {isInfoModalOpen && <InfoModal title={t('navUsefulInfo')} url="https://radiovocearomanilor.com/wp/informatii-utile/" onClose={() => setInfoModalOpen(false)} />}
+      {isAdvertisingModalOpen && <InfoModal title={t('navAdvertising')} url="https://radiovocearomanilor.com/wp/informatii-utile/publicitate-rvr/" onClose={() => setAdvertisingModalOpen(false)} />}
     </div>
   );
 };

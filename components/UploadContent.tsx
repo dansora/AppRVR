@@ -1,8 +1,13 @@
 import React, { useState } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
-import { UploadIcon } from './Icons';
+import { UploadIcon, UserIcon, WhatsAppIcon } from './Icons';
 
-const UploadContent: React.FC = () => {
+interface UploadContentProps {
+    isLoggedIn: boolean;
+    openAuthModal: () => void;
+}
+
+const UploadContent: React.FC<UploadContentProps> = ({ isLoggedIn, openAuthModal }) => {
   const { t } = useLanguage();
   const [fileName, setFileName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -33,6 +38,22 @@ const UploadContent: React.FC = () => {
 
     setIsSubmitting(false);
   };
+  
+  if (!isLoggedIn) {
+    return (
+        <div className="p-4 text-white font-roboto pb-20 text-center flex flex-col items-center justify-center h-[calc(100vh-200px)]">
+            <UserIcon className="w-16 h-16 text-golden-yellow/50 mb-4" />
+            <h1 className="text-2xl font-montserrat text-golden-yellow mb-4">{t('authRequiredTitle')}</h1>
+            <p className="text-white/80 mb-6 max-w-md">{t('authRequiredUpload')}</p>
+            <button
+                onClick={openAuthModal}
+                className="bg-golden-yellow text-marine-blue font-bold py-3 px-8 rounded-full hover:bg-yellow-400 transition-colors"
+            >
+                {t('navLogin')}
+            </button>
+        </div>
+    );
+  }
 
   return (
     <div className="p-4 text-white font-roboto pb-20">
@@ -98,6 +119,19 @@ const UploadContent: React.FC = () => {
           </form>
         )}
       </div>
+
+      <div className="mt-8 text-center">
+        <a
+          href="https://chat.whatsapp.com/DZzIOARyfbwIq3LUPAiP1G?mode=wwc"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center justify-center gap-2 bg-green-500 text-white font-bold py-3 px-6 rounded-full hover:bg-green-600 transition-colors duration-300"
+        >
+          <WhatsAppIcon className="w-6 h-6" />
+          {t('uploadWhatsappChat')}
+        </a>
+      </div>
+
     </div>
   );
 };

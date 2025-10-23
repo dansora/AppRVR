@@ -155,6 +155,24 @@ export const DonateIcon: React.FC<IconProps> = ({ className, style }) => (
   </svg>
 );
 
+export const EventsIcon: React.FC<IconProps> = ({ className, style }) => (
+  <svg className={className} style={style} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M17 12h-5v5h5v-5zM16 1v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-1V1h-2zm3 18H5V8h14v11z"/>
+  </svg>
+);
+
+export const InfoIcon: React.FC<IconProps> = ({ className, style }) => (
+  <svg className={className} style={style} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+  </svg>
+);
+
+export const AdvertisingIcon: React.FC<IconProps> = ({ className, style }) => (
+    <svg className={className} style={style} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M20.2,7.4C20.2,7.4,20.2,7.4,20.2,7.4C20,7.2,19.8,7,19.5,7h-2.1c-0.2,0-0.4,0.1-0.6,0.3L12.5,11H8c-1.1,0-2,0.9-2,2v2 c0,1.1,0.9,2,2,2h4.5l4.3,3.7c0.2,0.1,0.4,0.3,0.6,0.3h2.1c0.6,0,1-0.7,0.7-1.2l-2.2-3.8h1.5c1.1,0,2-0.9,2-2v-3 C21,7.9,20.6,7.4,20.2,7.4z M4,11h1v6H4V11z"/>
+    </svg>
+);
+
 export const ArrowUpIcon: React.FC<IconProps> = ({ className, style }) => (
     <svg className={className} style={style} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
         <path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z" />
