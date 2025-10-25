@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { useLanguage } from '../contexts/LanguageContext';
+import ResendAnnouncementModal from './ResendAnnouncementModal';
 
 interface Announcement {
   id: number;
@@ -16,6 +17,8 @@ const AdminPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  const [isResendModalOpen, setIsResendModalOpen] = useState(false);
+  const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
 
   // Form state
   const [newTitle, setNewTitle] = useState('');
@@ -36,9 +39,14 @@ const AdminPage: React.FC = () => {
       }
       setAnnouncements(data || []);
     } catch (err: any) {
-        const message = err.message || JSON.stringify(err);
-        setError(`${t('newsError')}: ${message}`);
         console.error("Error fetching announcements:", err);
+        let specificError = 'An unknown error occurred.';
+        if (typeof err === 'object' && err !== null) {
+            specificError = (err as any).message || JSON.stringify(err);
+        } else if (err) {
+            specificError = String(err);
+        }
+        setError(`${t('newsError')}: ${specificError}`);
     } finally {
         setLoading(false);
     }
@@ -51,6 +59,11 @@ const AdminPage: React.FC = () => {
   const handleCreateAnnouncement = async (e: React.FormEvent) => {
     e.preventDefault();
     setMessage(null);
+
+    if (!newContent) {
+        setMessage({ type: 'error', text: 'Content cannot be empty.' });
+        return;
+    }
     
     const { error: insertError } = await supabase
         .from('announcements')
@@ -87,6 +100,16 @@ const AdminPage: React.FC = () => {
             fetchAnnouncements(); // Refresh list
         }
     }
+  };
+  
+  const handleOpenResendModal = (announcement: Announcement) => {
+    setSelectedAnnouncement(announcement);
+    setIsResendModalOpen(true);
+  };
+
+  const handleResendSuccess = () => {
+    setMessage({ type: 'success', text: t('adminResendSuccess') });
+    fetchAnnouncements(); // Refresh the list
   };
 
 
@@ -149,17 +172,32 @@ const AdminPage: React.FC = () => {
                     )}
                   </div>
                 </div>
-                <button 
-                  onClick={() => handleDeleteAnnouncement(ann.id)}
-                  className="bg-red-600 text-white font-bold py-1 px-3 rounded-full hover:bg-red-700 transition-colors text-sm flex-shrink-0"
-                >
-                  {t('adminDeleteButton')}
-                </button>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                    <button 
+                      onClick={() => handleOpenResendModal(ann)}
+                      className="bg-blue-600 text-white font-bold py-1 px-3 rounded-full hover:bg-blue-700 transition-colors text-sm"
+                    >
+                      {t('adminResendButton')}
+                    </button>
+                    <button 
+                      onClick={() => handleDeleteAnnouncement(ann.id)}
+                      className="bg-red-600 text-white font-bold py-1 px-3 rounded-full hover:bg-red-700 transition-colors text-sm"
+                    >
+                      {t('adminDeleteButton')}
+                    </button>
+                </div>
               </div>
             ))}
           </div>
         </div>
       </div>
+      {isResendModalOpen && (
+        <ResendAnnouncementModal 
+            announcement={selectedAnnouncement}
+            onClose={() => setIsResendModalOpen(false)}
+            onSuccess={handleResendSuccess}
+        />
+      )}
     </div>
   );
 };

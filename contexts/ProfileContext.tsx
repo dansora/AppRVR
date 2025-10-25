@@ -50,8 +50,13 @@ export const ProfileProvider: React.FC<{ children: ReactNode }> = ({ children })
         setProfile(data as Profile);
       } catch (error: any) {
         console.error('Error fetching profile:', error);
-        const message = error.message || JSON.stringify(error);
-        setProfileError(message);
+        let specificError = 'An unknown error occurred.';
+        if (typeof error === 'object' && error !== null) {
+            specificError = (error as any).message || JSON.stringify(error);
+        } else if (error) {
+            specificError = String(error);
+        }
+        setProfileError(specificError);
       } finally {
         setLoadingProfile(false);
       }

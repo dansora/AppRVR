@@ -47,12 +47,17 @@ const Announcements: React.FC<AnnouncementsProps> = ({ userId }) => {
         }
 
         if (data) {
-          setAnnouncements(data);
+          setAnnouncements(data as Announcement[]);
         }
       } catch (err: any) {
         console.error('Error fetching announcements:', err);
-        const message = err.message || JSON.stringify(err);
-        setError(`${t('newsError')}: ${message}`);
+        let specificError = 'An unknown error occurred.';
+        if (typeof err === 'object' && err !== null) {
+            specificError = (err as any).message || JSON.stringify(err);
+        } else if (err) {
+            specificError = String(err);
+        }
+        setError(`${t('newsError')}: ${specificError}`);
       } finally {
         setLoading(false);
       }
