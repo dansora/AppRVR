@@ -5,20 +5,21 @@ import { NewsIcon, SportIcon, WeatherIcon, ChevronRightIcon, FacebookIcon, Whats
 import ContactModal from './ContactModal';
 import DonationModal from './DonationModal';
 import InfoModal from './InfoModal';
+import StoreRedirectModal from './StoreRedirectModal';
 
 interface HomePageProps {
   setActivePage: (page: Page) => void;
   isLoggedIn: boolean;
-  username: string;
 }
 
-const HomePage: React.FC<HomePageProps> = ({ setActivePage, isLoggedIn, username }) => {
+const HomePage: React.FC<HomePageProps> = ({ setActivePage, isLoggedIn }) => {
   const { t } = useLanguage();
   const [isContactModalOpen, setContactModalOpen] = useState(false);
   const [isDonationModalOpen, setDonationModalOpen] = useState(false);
   const [isEventsModalOpen, setEventsModalOpen] = useState(false);
   const [isInfoModalOpen, setInfoModalOpen] = useState(false);
   const [isAdvertisingModalOpen, setAdvertisingModalOpen] = useState(false);
+  const [isStoreModalOpen, setIsStoreModalOpen] = useState(false);
 
   const quickLinks = [
     { key: Page.News, icon: NewsIcon, title: t('navNews'), action: () => setActivePage(Page.News) },
@@ -31,7 +32,7 @@ const HomePage: React.FC<HomePageProps> = ({ setActivePage, isLoggedIn, username
 
   const socialLinks = [
     { href: "https://www.facebook.com/groups/1331920294319593", icon: FacebookIcon },
-    { href: "https://web.whatsapp.com/", icon: WhatsAppIcon },
+    { href: "https://chat.whatsapp.com/DZzIOARyfbwIq3LUPAiP1G?mode=wwc", icon: WhatsAppIcon },
     { href: "https://www.youtube.com/@radiovocearomanilor8992", icon: YouTubeIcon },
     { href: "https://www.linkedin.com/", icon: LinkedInIcon },
   ];
@@ -57,15 +58,13 @@ const HomePage: React.FC<HomePageProps> = ({ setActivePage, isLoggedIn, username
         </div>
         
         <div className="pt-6 flex flex-col sm:flex-row items-center justify-center gap-4">
-            <a
-                href="https://radio-vocea-romanilor-1.sumupstore.com/"
-                target="_blank"
-                rel="noopener noreferrer"
+            <button
+                onClick={() => setIsStoreModalOpen(true)}
                 className="w-full sm:w-auto bg-golden-yellow text-marine-blue font-bold py-3 px-8 rounded-full hover:bg-yellow-400 transition-colors duration-300 flex items-center justify-center gap-2"
             >
                 <StoreIcon className="w-5 h-5" />
                 {t('homeRvrStore')}
-            </a>
+            </button>
             <button
                 onClick={() => setDonationModalOpen(true)}
                 className="w-full sm:w-auto bg-golden-yellow text-marine-blue font-bold py-3 px-8 rounded-full hover:bg-yellow-400 transition-colors duration-300 flex items-center justify-center gap-2"
@@ -100,6 +99,7 @@ const HomePage: React.FC<HomePageProps> = ({ setActivePage, isLoggedIn, username
       {isEventsModalOpen && <InfoModal title={t('navEvents')} url="https://radiovocearomanilor.com/wp/informatii-utile/evenimente-rvr/" onClose={() => setEventsModalOpen(false)} />}
       {isInfoModalOpen && <InfoModal title={t('navUsefulInfo')} url="https://radiovocearomanilor.com/wp/informatii-utile/" onClose={() => setInfoModalOpen(false)} />}
       {isAdvertisingModalOpen && <InfoModal title={t('navAdvertising')} url="https://radiovocearomanilor.com/wp/informatii-utile/publicitate-rvr/" onClose={() => setAdvertisingModalOpen(false)} />}
+      {isStoreModalOpen && <StoreRedirectModal onClose={() => setIsStoreModalOpen(false)} />}
     </div>
   );
 };

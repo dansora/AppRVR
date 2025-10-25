@@ -6,6 +6,7 @@ import { MailIcon, DonateIcon, FacebookIcon, WhatsAppIcon, YouTubeIcon, LinkedIn
 import TermsModal from './TermsModal';
 import DonationModal from './DonationModal';
 import { supabase } from '../services/supabaseClient';
+import Announcements from './Announcements';
 
 interface SettingsPageProps {
     onReviewTerms: () => void;
@@ -29,7 +30,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onReviewTerms, isLoggedIn }
   
   const socialLinks = [
     { href: "https://www.facebook.com/groups/1331920294319593", icon: FacebookIcon },
-    { href: "https://web.whatsapp.com/", icon: WhatsAppIcon },
+    { href: "https://chat.whatsapp.com/DZzIOARyfbwIq3LUPAiP1G?mode=wwc", icon: WhatsAppIcon },
     { href: "https://www.youtube.com/@radiovocearomanilor8992", icon: YouTubeIcon },
     { href: "https://www.linkedin.com/", icon: LinkedInIcon },
   ];
@@ -76,6 +77,12 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onReviewTerms, isLoggedIn }
       <div className="p-4 text-white font-roboto pb-20">
         <h1 className="text-3xl font-montserrat text-golden-yellow mb-6">{t('settingsTitle')}</h1>
         
+        {!isLoggedIn && (
+            <div className="mb-6">
+                <Announcements />
+            </div>
+        )}
+
         <div className="space-y-6">
             <div className="bg-marine-blue-darker p-6 rounded-lg">
                 <h2 className="text-xl font-montserrat mb-4 text-golden-yellow">{t('settingsFontSize')}</h2>

@@ -4,6 +4,7 @@ import App from './App';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { SettingsProvider } from './contexts/SettingsContext';
 import { AudioProvider } from './contexts/AudioContext';
+import { ProfileProvider } from './contexts/ProfileContext';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -16,7 +17,9 @@ root.render(
     <LanguageProvider>
       <SettingsProvider>
         <AudioProvider>
-          <App />
+          <ProfileProvider>
+            <App />
+          </ProfileProvider>
         </AudioProvider>
       </SettingsProvider>
     </LanguageProvider>

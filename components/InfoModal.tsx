@@ -18,7 +18,7 @@ const InfoModal: React.FC<InfoModalProps> = ({ onClose, title, url }) => {
       onClick={onClose}
     >
       <div 
-        className="bg-marine-blue-darkest w-full max-w-4xl rounded-lg shadow-xl text-white flex flex-col h-[95vh]"
+        className="bg-marine-blue-darkest w-full max-w-2xl rounded-lg shadow-xl text-white flex flex-col max-h-[90vh]"
         onClick={e => e.stopPropagation()}
       >
         <header className="flex items-center justify-between p-4 border-b border-white/20 flex-shrink-0">

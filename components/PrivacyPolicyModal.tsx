@@ -15,7 +15,7 @@ const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({ onClose }) => {
       onClick={onClose}
     >
       <div 
-        className="bg-marine-blue-darkest w-full max-w-lg rounded-lg shadow-xl text-white flex flex-col h-[90vh]"
+        className="bg-marine-blue-darkest w-full max-w-lg rounded-lg shadow-xl text-white flex flex-col max-h-[85vh]"
         onClick={e => e.stopPropagation()}
       >
         <header className="flex items-center justify-between p-4 border-b border-white/20">

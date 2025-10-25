@@ -13,13 +13,15 @@ import WeatherPage from './components/WeatherPage';
 import { useSettings } from './contexts/SettingsContext';
 import ScrollToTopButton from './components/ScrollToTopButton';
 import AuthModal from './components/AuthModal';
-import { UserIcon, FlagUkIcon, FlagRoIcon, SettingsIcon } from './components/Icons';
+import { UserIcon, FlagUkIcon, FlagRoIcon, SettingsIcon, AdminIcon } from './components/Icons';
 import { useLanguage } from './contexts/LanguageContext';
 import TermsModal from './components/TermsModal';
 import StickyRadioPlayer from './components/StickyRadioPlayer';
 import { supabase } from './services/supabaseClient';
 import type { Session } from '@supabase/supabase-js';
 import ProfilePage from './components/ProfilePage';
+import { useProfile } from './contexts/ProfileContext';
+import AdminPage from './components/AdminPage';
 
 type ConsentStatus = 'pending' | 'accepted' | 'declined';
 
@@ -27,28 +29,14 @@ const App: React.FC = () => {
   const [showOnboarding, setShowOnboarding] = useState(true);
   const [activePage, setActivePage] = useState<Page>(Page.Home);
   const { fontSize } = useSettings();
-  const [session, setSession] = useState<Session | null>(null);
   const [isAuthModalOpen, setAuthModalOpen] = useState(false);
   const { t, language, setLanguage } = useLanguage();
+  const { session, profile, loadingProfile } = useProfile();
 
   const [consentStatus, setConsentStatus] = useState<ConsentStatus>('pending');
   const [isConsentModalOpen, setIsConsentModalOpen] = useState(false);
   const [isUserMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-    });
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -108,8 +96,8 @@ const App: React.FC = () => {
   }
   
   const getUsername = () => {
-      if (!session) return '';
-      return session.user.user_metadata?.username || session.user.email?.split('@')[0] || 'User';
+      if (loadingProfile) return '...';
+      return profile?.username || session?.user?.email?.split('@')[0] || 'User';
   }
 
   const RestrictedModeBanner = () => (
@@ -130,7 +118,7 @@ const App: React.FC = () => {
 
     switch (activePage) {
       case Page.Home:
-        return <HomePage setActivePage={setActivePage} isLoggedIn={isLoggedIn} username={getUsername()} />;
+        return <HomePage setActivePage={setActivePage} isLoggedIn={isLoggedIn} />;
       case Page.Radio:
         return <RadioPlayer setActivePage={setActivePage} />;
       case Page.News:
@@ -147,8 +135,11 @@ const App: React.FC = () => {
         return <SettingsPage onReviewTerms={() => setIsConsentModalOpen(true)} isLoggedIn={isLoggedIn} />;
       case Page.Profile:
         return <ProfilePage setActivePage={setActivePage} />;
+      case Page.Admin:
+        // Secure this page view
+        return profile?.role === 'admin' ? <AdminPage /> : <HomePage setActivePage={setActivePage} isLoggedIn={isLoggedIn} />;
       default:
-        return <HomePage setActivePage={setActivePage} isLoggedIn={isLoggedIn} username={getUsername()} />;
+        return <HomePage setActivePage={setActivePage} isLoggedIn={isLoggedIn} />;
     }
   };
   
@@ -190,6 +181,15 @@ const App: React.FC = () => {
                     </button>
                     {isUserMenuOpen && (
                         <div className="absolute right-0 mt-2 w-48 bg-marine-blue-darker rounded-md shadow-lg py-1 z-50">
+                            {profile?.role === 'admin' && (
+                                <button
+                                  onClick={() => { setActivePage(Page.Admin); setUserMenuOpen(false); }}
+                                  className="flex items-center gap-3 w-full text-left px-4 py-2 text-sm text-white hover:bg-marine-blue-darkest"
+                                >
+                                  <AdminIcon className="w-5 h-5" />
+                                  {t('adminNav')}
+                                </button>
+                            )}
                             <button
                               onClick={handleLogout}
                               className="block w-full text-left px-4 py-2 text-sm text-white hover:bg-marine-blue-darkest"
