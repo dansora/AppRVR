@@ -1,7 +1,10 @@
-import React, { createContext, useState, useContext, ReactNode, useRef, useEffect } from 'react';
+import React, { createContext, useState, useContext, ReactNode, useRef, useEffect, useCallback } from 'react';
 import { useLanguage } from './LanguageContext';
 
 const STREAM_URL = "https://stream.zeno.fm/355eg6c0txhvv";
+const METADATA_URL = "https://live.zeno.fm/api/zeno/nowplaying/s73549";
+const CORS_PROXY_URL = "https://api.allorigins.win/raw?url=";
+const DEFAULT_ALBUM_ART = "https://picsum.photos/seed/albumart/400/400";
 
 interface AudioContextType {
   isPlaying: boolean;
@@ -9,6 +12,7 @@ interface AudioContextType {
   volume: number;
   setVolume: (volume: number) => void;
   trackTitle: string;
+  albumArtUrl: string;
 }
 
 const AudioContext = createContext<AudioContextType | undefined>(undefined);
@@ -16,14 +20,64 @@ const AudioContext = createContext<AudioContextType | undefined>(undefined);
 export const AudioProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolumeState] = useState(0.3); // Initial volume at 30%
-  const [trackTitle, setTrackTitle] = useState('');
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   const { t } = useLanguage();
+  const [trackTitle, setTrackTitle] = useState(t('radioLiveBroadcast'));
+  const [albumArtUrl, setAlbumArtUrl] = useState(DEFAULT_ALBUM_ART);
+
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const metadataIntervalRef = useRef<number | null>(null);
+  
+  const fetchMetadata = useCallback(async () => {
+    try {
+      const response = await fetch(`${CORS_PROXY_URL}${encodeURIComponent(METADATA_URL)}`);
+      if (!response.ok) {
+        console.error('Failed to fetch metadata:', response.status);
+        return; // Don't crash the player, just log the error
+      }
+      const data = await response.json();
+      if (data && data.title && data.title.trim() !== "") {
+        setTrackTitle(data.title);
+        if (data.album_art && data.album_art.startsWith('http')) {
+          setAlbumArtUrl(data.album_art);
+        } else {
+          setAlbumArtUrl(DEFAULT_ALBUM_ART);
+        }
+      } else {
+        // Handle case where metadata is empty but request is successful
+        setTrackTitle(t('radioLiveBroadcast'));
+        setAlbumArtUrl(DEFAULT_ALBUM_ART);
+      }
+    } catch (error) {
+      console.error('Error fetching or parsing metadata:', error);
+      // Reset to default on error to avoid showing stale data
+      setTrackTitle(t('radioLiveBroadcast'));
+      setAlbumArtUrl(DEFAULT_ALBUM_ART);
+    }
+  }, [t]);
 
   useEffect(() => {
-    // Set a static title as metadata fetching is disabled for now
-    setTrackTitle(t('radioLiveBroadcast'));
-  }, [t]);
+    if (isPlaying) {
+      fetchMetadata();
+      metadataIntervalRef.current = window.setInterval(fetchMetadata, 15000); // Fetch every 15 seconds
+    } else {
+      // Stop fetching when not playing
+      if (metadataIntervalRef.current) {
+        clearInterval(metadataIntervalRef.current);
+        metadataIntervalRef.current = null;
+      }
+      // Reset to default when stopped
+      setTrackTitle(t('radioLiveBroadcast'));
+      setAlbumArtUrl(DEFAULT_ALBUM_ART);
+    }
+
+    return () => {
+      // Cleanup on component unmount
+      if (metadataIntervalRef.current) {
+        clearInterval(metadataIntervalRef.current);
+      }
+    };
+  }, [isPlaying, t, fetchMetadata]);
+
 
   const togglePlay = () => {
     if (!audioRef.current) {
@@ -74,7 +128,7 @@ export const AudioProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   }, []);
 
   return (
-    <AudioContext.Provider value={{ isPlaying, togglePlay, volume, setVolume, trackTitle }}>
+    <AudioContext.Provider value={{ isPlaying, togglePlay, volume, setVolume, trackTitle, albumArtUrl }}>
       {children}
     </AudioContext.Provider>
   );

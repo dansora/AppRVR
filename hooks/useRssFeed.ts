@@ -16,7 +16,7 @@ interface RssFeedState {
   refetch: () => Promise<void>;
 }
 
-const CORS_PROXY = "https://corsproxy.io/?";
+const CORS_PROXY_URL = "https://api.allorigins.win/raw?url=";
 
 const useRssFeed = (feedUrl: string, limit: number = 10): RssFeedState => {
   const [items, setItems] = useState<RssItem[]>([]);
@@ -27,7 +27,7 @@ const useRssFeed = (feedUrl: string, limit: number = 10): RssFeedState => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${CORS_PROXY}${encodeURIComponent(feedUrl)}`);
+      const response = await fetch(`${CORS_PROXY_URL}${encodeURIComponent(feedUrl)}`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }

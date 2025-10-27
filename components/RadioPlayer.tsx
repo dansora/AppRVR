@@ -9,14 +9,14 @@ interface RadioPlayerProps {
 }
 
 const RadioPlayer: React.FC<RadioPlayerProps> = ({ setActivePage }) => {
-  const { isPlaying, togglePlay, volume, setVolume, trackTitle } = useAudio();
+  const { isPlaying, togglePlay, volume, setVolume, trackTitle, albumArtUrl } = useAudio();
   const { t } = useLanguage();
 
   return (
     <div className="flex flex-col items-center justify-center h-full text-white p-4">
       <div className="w-full max-w-sm bg-marine-blue-darker rounded-2xl shadow-lg p-8 text-center">
         <img 
-          src="https://picsum.photos/seed/albumart/400/400" 
+          src={albumArtUrl}
           alt="Album Art" 
           className={`w-56 h-56 rounded-full mx-auto mb-6 shadow-2xl border-4 border-white/20 ${isPlaying ? 'animate-spin' : ''}`}
           style={{ animationDuration: '30s', animationTimingFunction: 'linear', animationIterationCount: 'infinite' }}

@@ -202,3 +202,9 @@ export const AdminIcon: React.FC<IconProps> = ({ className, style }) => (
     <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/>
   </svg>
 );
+
+export const BarChartIcon: React.FC<IconProps> = ({ className, style }) => (
+    <svg className={className} style={style} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M5 9.2h3V19H5zM10.6 5h2.8v14h-2.8zm5.6 8H19v6h-2.8z"/>
+    </svg>
+);
