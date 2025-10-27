@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import useRssFeed from '../hooks/useRssFeed';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Page } from '../types';
@@ -17,34 +17,42 @@ const SportPage: React.FC<SportPageProps> = ({ setActivePage }) => {
 
   const [touchStartY, setTouchStartY] = useState(0);
   const [pullDistance, setPullDistance] = useState(0);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  
+  useEffect(() => {
+    if (!loading) {
+      setPullDistance(0);
+    }
+  }, [loading]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
-    if (window.scrollY === 0) {
+    if (window.scrollY === 0 && !loading) {
       setTouchStartY(e.touches[0].clientY);
+      setIsDragging(true);
     }
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (touchStartY === 0) return;
+    if (!isDragging) return;
 
     const currentY = e.touches[0].clientY;
     let distance = currentY - touchStartY;
     
     if (distance > 0) {
        e.preventDefault();
-       setPullDistance(Math.min(distance, REFRESH_THRESHOLD + 20));
+       setPullDistance(distance);
     }
   };
 
-  const handleTouchEnd = async () => {
+  const handleTouchEnd = () => {
+    setIsDragging(false);
     if (pullDistance >= REFRESH_THRESHOLD) {
-      setIsRefreshing(true);
-      await refetch();
-      setIsRefreshing(false);
+      refetch();
+      setPullDistance(REFRESH_THRESHOLD);
+    } else {
+      setPullDistance(0);
     }
     setTouchStartY(0);
-    setPullDistance(0);
   };
 
   const formatDate = (dateString: string) => {
@@ -63,8 +71,19 @@ const SportPage: React.FC<SportPageProps> = ({ setActivePage }) => {
     if (loading && items.length === 0) {
       return <div className="text-center p-10">{t('newsLoading')}</div>;
     }
-    if (error) {
-      return <div className="text-center p-10 text-red-400">{t('newsError')}</div>;
+    if (error && items.length === 0) {
+      return (
+        <div className="text-center p-10 text-red-400">
+          <p>{t('newsError')}</p>
+          {error.message && <p className="text-sm text-white/70 mt-2">{error.message}</p>}
+          <button
+            onClick={() => refetch()}
+            className="mt-4 bg-golden-yellow text-marine-blue font-bold py-2 px-6 rounded-full hover:bg-yellow-400 transition-colors"
+          >
+            {t('retry')}
+          </button>
+        </div>
+      );
     }
     if (items.length === 0) {
       return <div className="text-center p-10">{t('newsNoItems')}</div>;
@@ -90,6 +109,9 @@ const SportPage: React.FC<SportPageProps> = ({ setActivePage }) => {
       </div>
     );
   };
+  
+  const transitionClass = isDragging ? '' : 'transition-transform duration-300';
+  const effectivePullDistance = loading ? REFRESH_THRESHOLD : Math.min(pullDistance, REFRESH_THRESHOLD);
 
   return (
     <div 
@@ -99,10 +121,13 @@ const SportPage: React.FC<SportPageProps> = ({ setActivePage }) => {
       onTouchEnd={handleTouchEnd}
     >
         <div 
-            className="absolute top-0 left-0 right-0 flex justify-center items-center transition-opacity"
-            style={{ height: `${REFRESH_THRESHOLD}px`, opacity: pullDistance / REFRESH_THRESHOLD, transform: `translateY(${Math.min(pullDistance, REFRESH_THRESHOLD)}px)` }}
+            className="absolute top-0 left-0 right-0 flex justify-center items-center"
+            style={{ 
+              height: `${REFRESH_THRESHOLD}px`,
+              transform: `translateY(-${REFRESH_THRESHOLD}px) translateY(${effectivePullDistance}px)`
+            }}
         >
-            {isRefreshing ? (
+            {loading ? (
                 <RefreshIcon className="w-8 h-8 text-golden-yellow animate-spin" />
             ) : (
                 <div className="text-center text-golden-yellow">
@@ -115,7 +140,12 @@ const SportPage: React.FC<SportPageProps> = ({ setActivePage }) => {
             )}
         </div>
         
-        <div style={{ transform: `translateY(${pullDistance}px)` }} className="transition-transform">
+        <div style={{ transform: `translateY(${loading ? effectivePullDistance : pullDistance}px)` }} className={transitionClass}>
+            {error && items.length > 0 && (
+                <div className="bg-red-500/20 text-red-300 p-3 rounded-md text-center mb-4">
+                  {t('newsRefreshError')}
+                </div>
+            )}
             <div className="flex justify-between items-center mb-4">
                 <h1 className="text-3xl font-montserrat text-golden-yellow">{t('navSport')}</h1>
             </div>

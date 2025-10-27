@@ -17,10 +17,21 @@ interface RssFeedState {
 }
 
 const CORS_PROXY_URL = "https://api.allorigins.win/raw?url=";
-const FETCH_TIMEOUT = 8000; // 8 seconds
+const FETCH_TIMEOUT = 15000; // Increased to 15 seconds
 
 const useRssFeed = (feedUrl: string, limit: number = 10): RssFeedState => {
-  const [items, setItems] = useState<RssItem[]>([]);
+  const cacheKey = `rvr-rss-cache-${feedUrl}`;
+  
+  const [items, setItems] = useState<RssItem[]>(() => {
+    try {
+        const cachedItems = localStorage.getItem(cacheKey);
+        return cachedItems ? JSON.parse(cachedItems) : [];
+    } catch (error) {
+        console.error("Failed to parse cached RSS feed:", error);
+        return [];
+    }
+  });
+  
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
@@ -34,6 +45,8 @@ const useRssFeed = (feedUrl: string, limit: number = 10): RssFeedState => {
       const response = await fetch(`${CORS_PROXY_URL}${encodeURIComponent(feedUrl)}`, {
         signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -62,6 +75,12 @@ const useRssFeed = (feedUrl: string, limit: number = 10): RssFeedState => {
         };
       });
       setItems(newItems);
+      try {
+        localStorage.setItem(cacheKey, JSON.stringify(newItems));
+      } catch (cacheError) {
+        console.error("Failed to cache RSS feed:", cacheError);
+      }
+
     } catch (err) {
       if ((err as Error).name === 'AbortError') {
         const timeoutError = new Error('Request timed out. The server took too long to respond.');
@@ -75,13 +94,15 @@ const useRssFeed = (feedUrl: string, limit: number = 10): RssFeedState => {
       clearTimeout(timeoutId);
       setLoading(false);
     }
-  }, [feedUrl, limit]);
+  }, [feedUrl, limit, cacheKey]);
 
   useEffect(() => {
     if (feedUrl) {
       fetchFeed();
     }
-  }, [feedUrl, fetchFeed]);
+  // This is intentional, we only want it to run on mount or when feedUrl changes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [feedUrl]);
 
   return { items, loading, error, refetch: fetchFeed };
 };

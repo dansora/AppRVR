@@ -11,7 +11,7 @@ interface UploadContentProps {
 
 const UploadContent: React.FC<UploadContentProps> = ({ isLoggedIn, openAuthModal }) => {
   const { t } = useLanguage();
-  const { session } = useProfile();
+  const { session, profile, loadingProfile } = useProfile();
   const [file, setFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'success' | 'error' | null>(null);
@@ -27,7 +27,7 @@ const UploadContent: React.FC<UploadContentProps> = ({ isLoggedIn, openAuthModal
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!session?.user) {
+    if (!session?.user || !profile) {
         openAuthModal();
         return;
     }
@@ -37,10 +37,11 @@ const UploadContent: React.FC<UploadContentProps> = ({ isLoggedIn, openAuthModal
     setSubmitMessage(null);
 
     const formData = new FormData(e.currentTarget as HTMLFormElement);
-    const name = formData.get('name') as string;
-    const email = formData.get('email') as string;
-    const phone = formData.get('phone') as string;
     const message = formData.get('message') as string;
+
+    const name = `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || profile.username || 'N/A';
+    const email = session.user.email || 'N/A';
+    const phone = profile.phone_number || '';
 
     let fileUrl: string | null = null;
 
@@ -110,6 +111,14 @@ const UploadContent: React.FC<UploadContentProps> = ({ isLoggedIn, openAuthModal
     );
   }
 
+  if (loadingProfile) {
+    return (
+        <div className="p-4 text-white font-roboto pb-20 text-center flex flex-col items-center justify-center h-[calc(100vh-200px)]">
+            <p>{t('newsLoading')}</p>
+        </div>
+    );
+  }
+
   return (
     <div className="p-4 text-white font-roboto pb-20">
       <div className="text-center mb-6">
@@ -130,18 +139,14 @@ const UploadContent: React.FC<UploadContentProps> = ({ isLoggedIn, openAuthModal
                     {submitMessage}
                 </div>
              )}
-            <div>
-              <label className="block text-sm font-medium text-white/80 mb-1">{t('uploadFormName')}</label>
-              <input type="text" name="name" required className="w-full bg-marine-blue-darkest/80 rounded-md p-2 text-white focus:ring-golden-yellow focus:border-golden-yellow border-transparent" />
+
+            <div className="p-4 bg-marine-blue-darkest/50 rounded-md border-l-4 border-golden-yellow">
+                <p className="text-sm font-medium text-white/80 mb-1">{t('uploadSubmittingAs')}:</p>
+                <p className="font-bold text-white text-lg">{`${profile?.first_name || ''} ${profile?.last_name || ''}`.trim() || profile?.username}</p>
+                <p className="text-xs text-white/70">{session?.user?.email}</p>
+                {profile?.phone_number && <p className="text-xs text-white/70 mt-1">{profile.phone_number}</p>}
             </div>
-            <div>
-              <label className="block text-sm font-medium text-white/80 mb-1">{t('uploadFormEmail')}</label>
-              <input type="email" name="email" required className="w-full bg-marine-blue-darkest/80 rounded-md p-2 text-white focus:ring-golden-yellow focus:border-golden-yellow border-transparent" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-white/80 mb-1">{t('uploadFormPhone')}</label>
-              <input type="tel" name="phone" className="w-full bg-marine-blue-darkest/80 rounded-md p-2 text-white focus:ring-golden-yellow focus:border-golden-yellow border-transparent" />
-            </div>
+
             <div>
               <label className="block text-sm font-medium text-white/80 mb-1">{t('uploadFormMessage')}</label>
               <textarea name="message" rows={5} required className="w-full bg-marine-blue-darkest/80 rounded-md p-2 text-white focus:ring-golden-yellow focus:border-golden-yellow border-transparent"></textarea>
@@ -159,7 +164,7 @@ const UploadContent: React.FC<UploadContentProps> = ({ isLoggedIn, openAuthModal
             <div>
               <button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || loadingProfile}
                 className="w-full mt-2 bg-golden-yellow text-marine-blue font-bold py-3 rounded-full hover:bg-yellow-400 transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed flex items-center justify-center"
               >
                 {isSubmitting ? (
