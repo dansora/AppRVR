@@ -3,7 +3,8 @@ import { useLanguage } from './LanguageContext';
 
 const STREAM_URL = "https://stream.zeno.fm/355eg6c0txhvv";
 const METADATA_URL = "https://live.zeno.fm/api/zeno/nowplaying/s73549";
-const CORS_PROXY_URL = "https://api.allorigins.win/raw?url=";
+// Use the /get endpoint which is more reliable and provides a structured JSON response.
+const CORS_PROXY_URL = "https://api.allorigins.win/get?url="; 
 const DEFAULT_ALBUM_ART = "https://picsum.photos/seed/albumart/400/400";
 
 interface AudioContextType {
@@ -34,7 +35,18 @@ export const AudioProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         console.error('Failed to fetch metadata:', response.status);
         return; // Don't crash the player, just log the error
       }
-      const data = await response.json();
+      
+      const wrapperData = await response.json();
+      
+      // Check if the actual request through the proxy was successful
+      if (wrapperData.status.http_code !== 200) {
+        console.error('Metadata endpoint returned an error:', wrapperData.status);
+        return;
+      }
+      
+      // The /get endpoint wraps the response in a JSON object. We need to parse the 'contents' property.
+      const data = JSON.parse(wrapperData.contents);
+
       if (data && data.title && data.title.trim() !== "") {
         setTrackTitle(data.title);
         if (data.album_art && data.album_art.startsWith('http')) {
