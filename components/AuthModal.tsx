@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
-import { CloseIcon, UserIcon } from './Icons';
+import { CloseIcon, UserIcon, GitHubIcon, GoogleIcon, FacebookIcon, AppleIcon } from './Icons';
 import { supabase } from '../services/supabaseClient';
+import type { Provider } from '@supabase/supabase-js';
 
 interface AuthModalProps {
   onClose: () => void;
@@ -46,8 +47,24 @@ const AuthModal: React.FC<AuthModalProps> = ({ onClose }) => {
             setMessage(t('authSuccessSignUp'));
         }
     } catch (err: any) {
-        setError(t('authError', { message: err.error_description || err.message }));
+        const message = err.error_description || err.message || (typeof err === 'object' && err !== null ? JSON.stringify(err) : String(err));
+        setError(t('authError', { message }));
     } finally {
+        setLoading(false);
+    }
+  };
+
+  const signInWithProvider = async (provider: Provider) => {
+    setLoading(true);
+    setError(null);
+    setMessage(null);
+    try {
+        const { error } = await supabase.auth.signInWithOAuth({ provider });
+        if (error) throw error;
+        // Supabase handles the redirect
+    } catch (err: any) {
+        const message = err.error_description || err.message || (typeof err === 'object' && err !== null ? JSON.stringify(err) : String(err));
+        setError(t('authError', { message }));
         setLoading(false);
     }
   };
@@ -90,31 +107,77 @@ const AuthModal: React.FC<AuthModalProps> = ({ onClose }) => {
             {message && <div className="bg-green-500/20 text-green-300 p-3 rounded-md text-center mb-4">{message}</div>}
 
             <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-                <label className="block text-sm font-medium text-white/80 mb-1">{t('authEmailLabel')}</label>
-                <input type="email" name="email" required className="w-full bg-marine-blue-darker/80 rounded-md p-2 text-white focus:ring-golden-yellow focus:border-golden-yellow border-transparent" />
+                <div>
+                    <label className="block text-sm font-medium text-white/80 mb-1">{t('authEmailLabel')}</label>
+                    <input type="email" name="email" required className="w-full bg-marine-blue-darker/80 rounded-md p-2 text-white focus:ring-golden-yellow focus:border-golden-yellow border-transparent" />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-white/80 mb-1">{t('authPasswordLabel')}</label>
+                    <input type="password" name="password" required className="w-full bg-marine-blue-darker/80 rounded-md p-2 text-white focus:ring-golden-yellow focus:border-golden-yellow border-transparent" />
+                </div>
+                <div>
+                    <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full bg-golden-yellow text-marine-blue font-bold py-3 rounded-full hover:bg-yellow-400 transition-colors disabled:bg-gray-500 flex items-center justify-center"
+                    >
+                    {loading && <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>}
+                    {mode === 'login' ? t('authLoginButton') : t('authSignUpButton')}
+                    </button>
+                </div>
+            </form>
+
+            <div className="relative flex py-4 items-center">
+                <div className="flex-grow border-t border-white/20"></div>
+                <span className="flex-shrink mx-4 text-white/70 text-sm">{t('authOr')}</span>
+                <div className="flex-grow border-t border-white/20"></div>
             </div>
-            <div>
-                <label className="block text-sm font-medium text-white/80 mb-1">{t('authPasswordLabel')}</label>
-                <input type="password" name="password" required className="w-full bg-marine-blue-darker/80 rounded-md p-2 text-white focus:ring-golden-yellow focus:border-golden-yellow border-transparent" />
-            </div>
-            <div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-golden-yellow text-marine-blue font-bold py-3 rounded-full hover:bg-yellow-400 transition-colors disabled:bg-gray-500 flex items-center justify-center"
+                    type="button"
+                    onClick={() => signInWithProvider('google')}
+                    disabled={loading}
+                    className="w-full bg-white text-gray-700 font-bold py-3 rounded-full hover:bg-gray-200 transition-colors disabled:bg-gray-500 flex items-center justify-center gap-3 shadow"
                 >
-                {loading && <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>}
-                {mode === 'login' ? t('authLoginButton') : t('authSignUpButton')}
+                    <GoogleIcon className="w-5 h-5" />
+                    {t('authSignInWithGoogle')}
+                </button>
+                <button
+                    type="button"
+                    onClick={() => signInWithProvider('facebook')}
+                    disabled={loading}
+                    className="w-full bg-[#1877F2] text-white font-bold py-3 rounded-full hover:bg-[#166FE5] transition-colors disabled:bg-gray-500 flex items-center justify-center gap-3 shadow"
+                >
+                    <FacebookIcon className="w-5 h-5" />
+                    {t('authSignInWithFacebook')}
+                </button>
+                <button
+                    type="button"
+                    onClick={() => signInWithProvider('apple')}
+                    disabled={loading}
+                    className="w-full bg-black text-white font-bold py-3 rounded-full hover:bg-gray-800 transition-colors disabled:bg-gray-500 flex items-center justify-center gap-3 shadow"
+                >
+                    <AppleIcon className="w-5 h-5" />
+                    {t('authSignInWithApple')}
+                </button>
+                <button
+                    type="button"
+                    onClick={() => signInWithProvider('github')}
+                    disabled={loading}
+                    className="w-full bg-[#333] text-white font-bold py-3 rounded-full hover:bg-[#444] transition-colors disabled:bg-gray-500 flex items-center justify-center gap-3 shadow"
+                >
+                    <GitHubIcon className="w-5 h-5" />
+                    {t('authSignInWithGitHub')}
                 </button>
             </div>
-            <div className="text-center text-sm text-white/70">
+            
+            <div className="text-center text-sm text-white/70 mt-4">
                 {mode === 'login' ? t('authNoAccount') : t('authHaveAccount')}{' '}
                 <button type="button" onClick={toggleMode} className="font-medium text-golden-yellow hover:underline">
                     {mode === 'login' ? t('authSignUp') : t('authLogin')}
                 </button>
             </div>
-            </form>
         </div>
       </div>
     </div>

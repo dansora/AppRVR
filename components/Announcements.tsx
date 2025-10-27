@@ -8,6 +8,7 @@ interface Announcement {
   title: string;
   content: string;
   created_at: string;
+  image_url: string | null;
 }
 
 interface AnnouncementsProps {
@@ -28,7 +29,7 @@ const Announcements: React.FC<AnnouncementsProps> = ({ userId }) => {
       try {
         let query = supabase
           .from('announcements')
-          .select('id, title, content, created_at');
+          .select('id, title, content, created_at, image_url');
 
         if (userId) {
           // Logged-in user: fetch public AND user-specific announcements
@@ -102,6 +103,9 @@ const Announcements: React.FC<AnnouncementsProps> = ({ userId }) => {
         {announcements.map(ann => (
           <div key={ann.id} className="p-4 bg-marine-blue-darkest/50 rounded-md">
             <h3 className="font-bold text-white mb-1">{ann.title}</h3>
+            {ann.image_url && (
+              <img src={ann.image_url} alt={ann.title} className="my-2 w-full rounded-md object-cover max-h-48" />
+            )}
             <p className="text-white/80 text-sm whitespace-pre-wrap">{ann.content}</p>
             <p className="text-xs text-white/50 mt-2 text-right">
               {new Date(ann.created_at).toLocaleDateString(undefined, {

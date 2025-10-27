@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { UploadIcon, UserIcon, WhatsAppIcon } from './Icons';
+import { useProfile } from '../contexts/ProfileContext';
+import { supabase } from '../services/supabaseClient';
 
 interface UploadContentProps {
     isLoggedIn: boolean;
@@ -9,34 +11,87 @@ interface UploadContentProps {
 
 const UploadContent: React.FC<UploadContentProps> = ({ isLoggedIn, openAuthModal }) => {
   const { t } = useLanguage();
-  const [fileName, setFileName] = useState('');
+  const { session } = useProfile();
+  const [file, setFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'success' | 'error' | null>(null);
+  const [submitMessage, setSubmitMessage] = useState<string | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      setFileName(e.target.files[0].name);
+      setFile(e.target.files[0]);
     } else {
-      setFileName('');
+      setFile(null);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!session?.user) {
+        openAuthModal();
+        return;
+    }
+    
     setIsSubmitting(true);
     setSubmitStatus(null);
+    setSubmitMessage(null);
 
-    // Mock submission
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    const formData = new FormData(e.currentTarget as HTMLFormElement);
+    const name = formData.get('name') as string;
+    const email = formData.get('email') as string;
+    const phone = formData.get('phone') as string;
+    const message = formData.get('message') as string;
 
-    // Simulate success/error
-    if (Math.random() > 0.2) {
+    let fileUrl: string | null = null;
+
+    try {
+      if (file) {
+        let bucket = '';
+        if (file.type.startsWith('image/')) {
+          bucket = 'app-images';
+        } else if (file.type.startsWith('video/')) {
+          bucket = 'app-videos';
+        } else {
+          throw new Error(t('uploadErrorFileType'));
+        }
+
+        const filePath = `${session.user.id}/${Date.now()}-${file.name}`;
+        const { error: uploadError } = await supabase.storage.from(bucket).upload(filePath, file);
+
+        if (uploadError) {
+          throw uploadError;
+        }
+
+        const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
+        fileUrl = data.publicUrl;
+      }
+      
+      const { error: insertError } = await supabase.from('user_submissions').insert({
+        name,
+        email,
+        phone,
+        message,
+        file_url: fileUrl,
+        user_id: session.user.id,
+      });
+
+      if (insertError) {
+        throw insertError;
+      }
+      
       setSubmitStatus('success');
-    } else {
-      setSubmitStatus('error');
-    }
+      setSubmitMessage(t('uploadSuccess'));
+      setFile(null);
+      (e.target as HTMLFormElement).reset();
 
-    setIsSubmitting(false);
+    } catch (err: any) {
+      console.error('Submission error:', err);
+      const errorMessage = err.message || (typeof err === 'object' && err !== null ? JSON.stringify(err) : String(err));
+      setSubmitStatus('error');
+      setSubmitMessage(errorMessage || t('uploadError'));
+    } finally {
+      setIsSubmitting(false);
+    }
   };
   
   if (!isLoggedIn) {
@@ -66,13 +121,13 @@ const UploadContent: React.FC<UploadContentProps> = ({ isLoggedIn, openAuthModal
         <h2 className="text-xl font-montserrat text-white mb-4 text-center">{t('uploadFormTitle')}</h2>
         {submitStatus === 'success' ? (
           <div className="text-center p-4 bg-green-500/20 text-green-300 rounded-md">
-            {t('uploadSuccess')}
+            {submitMessage}
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
              {submitStatus === 'error' && (
                 <div className="text-center p-3 bg-red-500/20 text-red-300 rounded-md">
-                    {t('uploadError')}
+                    {submitMessage}
                 </div>
              )}
             <div>
@@ -94,9 +149,9 @@ const UploadContent: React.FC<UploadContentProps> = ({ isLoggedIn, openAuthModal
             <div>
                 <label className="block text-sm font-medium text-white/80 mb-1">{t('uploadFormFile')}</label>
                 <div className="relative">
-                    <input type="file" id="file-upload" className="absolute w-0 h-0 opacity-0" onChange={handleFileChange} />
+                    <input type="file" id="file-upload" accept="image/*,video/*" className="absolute w-0 h-0 opacity-0" onChange={handleFileChange} />
                     <label htmlFor="file-upload" className="cursor-pointer w-full flex justify-between items-center bg-marine-blue-darkest/80 rounded-md p-2 text-white/70 hover:bg-marine-blue-darkest">
-                        <span>{fileName || t('uploadFormFilePlaceholder')}</span>
+                        <span>{file?.name || t('uploadFormFilePlaceholder')}</span>
                         <UploadIcon className="w-5 h-5" />
                     </label>
                 </div>
