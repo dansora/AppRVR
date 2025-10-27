@@ -25,6 +25,10 @@ import AdminPage from './components/AdminPage';
 
 type ConsentStatus = 'pending' | 'accepted' | 'declined';
 
+interface Announcement {
+  id: number;
+}
+
 const App: React.FC = () => {
   const [showOnboarding, setShowOnboarding] = useState(true);
   const [activePage, setActivePage] = useState<Page>(Page.Home);
@@ -37,6 +41,9 @@ const App: React.FC = () => {
   const [isConsentModalOpen, setIsConsentModalOpen] = useState(false);
   const [isUserMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
+  
+  const [announcementCount, setAnnouncementCount] = useState(0);
+  const [allAnnouncements, setAllAnnouncements] = useState<Announcement[]>([]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -74,6 +81,43 @@ const App: React.FC = () => {
         document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [userMenuRef]);
+
+    useEffect(() => {
+    const fetchAndCountAnnouncements = async () => {
+        try {
+            let query = supabase.from('announcements').select('id');
+
+            if (session?.user) {
+                query = query.or(`user_id.is.null,user_id.eq.${session.user.id}`);
+            } else {
+                query = query.is('user_id', null);
+            }
+            
+            const { data, error } = await query;
+            if (error) throw error;
+
+            if (data) {
+                setAllAnnouncements(data);
+                const seenAnnouncementsRaw = localStorage.getItem('rvr-seen-announcements');
+                const seenIds = seenAnnouncementsRaw ? JSON.parse(seenAnnouncementsRaw) : [];
+                const newCount = data.filter(ann => !seenIds.includes(ann.id)).length;
+                setAnnouncementCount(newCount);
+            }
+        } catch (error) {
+            console.error("Error counting announcements:", error);
+        }
+    };
+
+    fetchAndCountAnnouncements();
+  }, [session]);
+
+  const markAnnouncementsAsSeen = () => {
+    if (allAnnouncements.length > 0 && announcementCount > 0) {
+        const announcementIds = allAnnouncements.map(ann => ann.id);
+        localStorage.setItem('rvr-seen-announcements', JSON.stringify(announcementIds));
+        setAnnouncementCount(0);
+    }
+  };
 
   const handleAcceptTerms = () => {
     localStorage.setItem('rvr-terms-consent', 'accepted');
@@ -118,7 +162,7 @@ const App: React.FC = () => {
 
     switch (activePage) {
       case Page.Home:
-        return <HomePage setActivePage={setActivePage} isLoggedIn={isLoggedIn} />;
+        return <HomePage setActivePage={setActivePage} isLoggedIn={isLoggedIn} openAuthModal={() => setAuthModalOpen(true)} />;
       case Page.Radio:
         return <RadioPlayer setActivePage={setActivePage} />;
       case Page.News:
@@ -137,9 +181,9 @@ const App: React.FC = () => {
         return <ProfilePage setActivePage={setActivePage} />;
       case Page.Admin:
         // Secure this page view
-        return profile?.role === 'admin' ? <AdminPage /> : <HomePage setActivePage={setActivePage} isLoggedIn={isLoggedIn} />;
+        return profile?.role === 'admin' ? <AdminPage /> : <HomePage setActivePage={setActivePage} isLoggedIn={isLoggedIn} openAuthModal={() => setAuthModalOpen(true)} />;
       default:
-        return <HomePage setActivePage={setActivePage} isLoggedIn={isLoggedIn} />;
+        return <HomePage setActivePage={setActivePage} isLoggedIn={isLoggedIn} openAuthModal={() => setAuthModalOpen(true)} />;
     }
   };
   
@@ -175,15 +219,20 @@ const App: React.FC = () => {
 
               {session ? (
                   <div className="relative" ref={userMenuRef}>
-                    <button onClick={() => setUserMenuOpen(!isUserMenuOpen)} className="flex items-center gap-2 text-white cursor-pointer">
+                    <button onClick={() => setUserMenuOpen(!isUserMenuOpen)} className="flex items-center gap-2 text-white cursor-pointer relative">
                       <UserIcon className="w-6 h-6" />
+                      {announcementCount > 0 && (
+                          <span className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-xs font-bold text-white shadow-md">
+                            {announcementCount}
+                          </span>
+                      )}
                       <span className="hidden sm:inline">{t('authLoggedInAs', { username: getUsername() })}</span>
                     </button>
                     {isUserMenuOpen && (
                         <div className="absolute right-0 mt-2 w-48 bg-marine-blue-darker rounded-md shadow-lg py-1 z-50">
                             {profile?.role === 'admin' && (
                                 <button
-                                  onClick={() => { setActivePage(Page.Admin); setUserMenuOpen(false); }}
+                                  onClick={() => { markAnnouncementsAsSeen(); setActivePage(Page.Admin); setUserMenuOpen(false); }}
                                   className="flex items-center gap-3 w-full text-left px-4 py-2 text-sm text-white hover:bg-marine-blue-darkest"
                                 >
                                   <AdminIcon className="w-5 h-5" />
@@ -200,12 +249,17 @@ const App: React.FC = () => {
                     )}
                   </div>
               ) : (
-                <button onClick={() => setAuthModalOpen(true)} className="flex items-center gap-2 text-white">
+                <button onClick={() => { markAnnouncementsAsSeen(); setAuthModalOpen(true); }} className="relative flex items-center gap-2 text-white">
                   <UserIcon className="w-6 h-6" />
+                  {announcementCount > 0 && (
+                      <span className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-xs font-bold text-white shadow-md">
+                        {announcementCount}
+                      </span>
+                  )}
                   <span className="hidden sm:inline">{t('navLogin')}</span>
                 </button>
               )}
-               <button onClick={() => setActivePage(Page.Settings)} className="text-white">
+               <button onClick={() => { markAnnouncementsAsSeen(); setActivePage(Page.Settings); }} className="text-white">
                   <SettingsIcon className="w-6 h-6" />
                </button>
             </div>
@@ -220,7 +274,7 @@ const App: React.FC = () => {
         <ScrollToTopButton />
 
         {consentStatus === 'accepted' && activePage !== Page.Radio && <StickyRadioPlayer setActivePage={setActivePage} />}
-        {consentStatus === 'accepted' && <BottomNav activePage={activePage} setActivePage={setActivePage} isLoggedIn={!!session} />}
+        {consentStatus === 'accepted' && <BottomNav activePage={activePage} setActivePage={setActivePage} isLoggedIn={!!session} markAnnouncementsAsSeen={markAnnouncementsAsSeen} />}
         
         {isAuthModalOpen && <AuthModal onClose={() => setAuthModalOpen(false)} />}
         

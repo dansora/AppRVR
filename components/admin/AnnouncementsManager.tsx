@@ -3,6 +3,7 @@ import { supabase } from '../../services/supabaseClient';
 import { useLanguage } from '../../contexts/LanguageContext';
 import ResendAnnouncementModal from '../ResendAnnouncementModal';
 import { BackIcon, UploadIcon } from '../Icons';
+import AnnouncementCard from '../AnnouncementCard';
 
 interface Announcement {
   id: number;
@@ -213,41 +214,38 @@ const AnnouncementsManager: React.FC<AnnouncementsManagerProps> = ({ onBack }) =
           {!loading && !error && announcements.length === 0 && <p>{t('adminNoAnnouncements')}</p>}
           <div className="space-y-4 max-h-screen overflow-y-auto pr-2">
             {announcements.map(ann => (
-              <div key={ann.id} className="p-4 bg-marine-blue-darkest/50 rounded-md flex justify-between items-start gap-4">
-                <div className="flex-grow">
-                  <h3 className="font-bold text-white mb-1">{ann.title}</h3>
-                  {ann.image_url && <img src={ann.image_url} alt={ann.title} className="mt-2 mb-2 w-full max-w-xs rounded-md object-cover"/>}
-                  <p className="text-white/80 text-sm whitespace-pre-wrap">{ann.content}</p>
-                  <div className="text-xs text-white/50 mt-2">
-                    <span>
-                      {new Date(ann.created_at).toLocaleString()}
-                    </span>
-                    {ann.user_id ? (
-                      <span className="ml-4 pl-4 border-l border-white/20">
-                        Target: {ann.user_id}
-                      </span>
-                    ) : (
-                      <span className="ml-4 pl-4 border-l border-white/20 font-semibold text-golden-yellow/80">
-                        PUBLIC
-                      </span>
-                    )}
-                  </div>
+              <AnnouncementCard key={ann.id} announcement={ann}>
+                <div className="mt-4 flex justify-between items-center w-full">
+                    <div className="text-xs text-white/50">
+                        <span>
+                        {new Date(ann.created_at).toLocaleString()}
+                        </span>
+                        {ann.user_id ? (
+                        <span className="ml-4 pl-4 border-l border-white/20">
+                            Target: {ann.user_id}
+                        </span>
+                        ) : (
+                        <span className="ml-4 pl-4 border-l border-white/20 font-semibold text-golden-yellow/80">
+                            PUBLIC
+                        </span>
+                        )}
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                        <button 
+                        onClick={() => handleOpenResendModal(ann)}
+                        className="bg-blue-600 text-white font-bold py-1 px-3 rounded-full hover:bg-blue-700 transition-colors text-sm"
+                        >
+                        {t('adminResendButton')}
+                        </button>
+                        <button 
+                        onClick={() => handleDeleteAnnouncement(ann.id)}
+                        className="bg-red-600 text-white font-bold py-1 px-3 rounded-full hover:bg-red-700 transition-colors text-sm"
+                        >
+                        {t('adminDeleteButton')}
+                        </button>
+                    </div>
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                    <button 
-                      onClick={() => handleOpenResendModal(ann)}
-                      className="bg-blue-600 text-white font-bold py-1 px-3 rounded-full hover:bg-blue-700 transition-colors text-sm"
-                    >
-                      {t('adminResendButton')}
-                    </button>
-                    <button 
-                      onClick={() => handleDeleteAnnouncement(ann.id)}
-                      className="bg-red-600 text-white font-bold py-1 px-3 rounded-full hover:bg-red-700 transition-colors text-sm"
-                    >
-                      {t('adminDeleteButton')}
-                    </button>
-                </div>
-              </div>
+              </AnnouncementCard>
             ))}
           </div>
         </div>

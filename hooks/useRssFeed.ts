@@ -17,6 +17,7 @@ interface RssFeedState {
 }
 
 const CORS_PROXY_URL = "https://api.allorigins.win/raw?url=";
+const FETCH_TIMEOUT = 8000; // 8 seconds
 
 const useRssFeed = (feedUrl: string, limit: number = 10): RssFeedState => {
   const [items, setItems] = useState<RssItem[]>([]);
@@ -26,8 +27,14 @@ const useRssFeed = (feedUrl: string, limit: number = 10): RssFeedState => {
   const fetchFeed = useCallback(async () => {
     setLoading(true);
     setError(null);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
+
     try {
-      const response = await fetch(`${CORS_PROXY_URL}${encodeURIComponent(feedUrl)}`);
+      const response = await fetch(`${CORS_PROXY_URL}${encodeURIComponent(feedUrl)}`, {
+        signal: controller.signal,
+      });
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -56,9 +63,16 @@ const useRssFeed = (feedUrl: string, limit: number = 10): RssFeedState => {
       });
       setItems(newItems);
     } catch (err) {
-      console.error("Failed to fetch RSS feed:", err);
-      setError(err as Error);
+      if ((err as Error).name === 'AbortError') {
+        const timeoutError = new Error('Request timed out. The server took too long to respond.');
+        console.error("Failed to fetch RSS feed:", timeoutError);
+        setError(timeoutError);
+      } else {
+        console.error("Failed to fetch RSS feed:", err);
+        setError(err as Error);
+      }
     } finally {
+      clearTimeout(timeoutId);
       setLoading(false);
     }
   }, [feedUrl, limit]);

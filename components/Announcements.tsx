@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { useLanguage } from '../contexts/LanguageContext';
 import { InfoIcon } from './Icons';
+import AnnouncementCard from './AnnouncementCard';
 
 interface Announcement {
   id: number;
@@ -101,18 +102,13 @@ const Announcements: React.FC<AnnouncementsProps> = ({ userId }) => {
       </h2>
       <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
         {announcements.map(ann => (
-          <div key={ann.id} className="p-4 bg-marine-blue-darkest/50 rounded-md">
-            <h3 className="font-bold text-white mb-1">{ann.title}</h3>
-            {ann.image_url && (
-              <img src={ann.image_url} alt={ann.title} className="my-2 w-full rounded-md object-cover max-h-48" />
-            )}
-            <p className="text-white/80 text-sm whitespace-pre-wrap">{ann.content}</p>
-            <p className="text-xs text-white/50 mt-2 text-right">
+          <AnnouncementCard key={ann.id} announcement={ann}>
+             <p className="text-xs text-white/50 mt-2 text-right w-full">
               {new Date(ann.created_at).toLocaleDateString(undefined, {
                 year: 'numeric', month: 'long', day: 'numeric'
               })}
             </p>
-          </div>
+          </AnnouncementCard>
         ))}
       </div>
     </div>

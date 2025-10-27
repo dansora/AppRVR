@@ -7,6 +7,7 @@ interface BottomNavProps {
   activePage: Page;
   setActivePage: (page: Page) => void;
   isLoggedIn: boolean;
+  markAnnouncementsAsSeen: () => void;
 }
 
 const NavItem: React.FC<{
@@ -29,7 +30,7 @@ const NavItem: React.FC<{
   );
 };
 
-const BottomNav: React.FC<BottomNavProps> = ({ activePage, setActivePage, isLoggedIn }) => {
+const BottomNav: React.FC<BottomNavProps> = ({ activePage, setActivePage, isLoggedIn, markAnnouncementsAsSeen }) => {
   const { t } = useLanguage();
   
   const baseNavItems = [
@@ -58,7 +59,12 @@ const BottomNav: React.FC<BottomNavProps> = ({ activePage, setActivePage, isLogg
               ? newsPages.includes(activePage) 
               : activePage === item.page
           }
-          onClick={() => setActivePage(item.page)}
+          onClick={() => {
+            if (item.page === Page.Profile) {
+                markAnnouncementsAsSeen();
+            }
+            setActivePage(item.page);
+          }}
         />
       ))}
     </nav>

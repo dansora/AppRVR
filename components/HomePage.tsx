@@ -1,33 +1,67 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Page } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
 import { NewsIcon, SportIcon, WeatherIcon, ChevronRightIcon, FacebookIcon, WhatsAppIcon, YouTubeIcon, LinkedInIcon, MailIcon, DonateIcon, StoreIcon, EventsIcon, InfoIcon, AdvertisingIcon } from './Icons';
 import ContactModal from './ContactModal';
 import DonationModal from './DonationModal';
-import InfoModal from './InfoModal';
-import StoreRedirectModal from './StoreRedirectModal';
+import RedirectModal from './RedirectModal';
+import { supabase } from '../services/supabaseClient';
+import AnnouncementCard from './AnnouncementCard';
 
 interface HomePageProps {
   setActivePage: (page: Page) => void;
   isLoggedIn: boolean;
+  openAuthModal: () => void;
 }
 
-const HomePage: React.FC<HomePageProps> = ({ setActivePage, isLoggedIn }) => {
+interface Announcement {
+  id: number;
+  title: string;
+  content: string;
+  created_at: string;
+  image_url: string | null;
+}
+
+const HomePage: React.FC<HomePageProps> = ({ setActivePage, isLoggedIn, openAuthModal }) => {
   const { t } = useLanguage();
   const [isContactModalOpen, setContactModalOpen] = useState(false);
   const [isDonationModalOpen, setDonationModalOpen] = useState(false);
-  const [isEventsModalOpen, setEventsModalOpen] = useState(false);
-  const [isInfoModalOpen, setInfoModalOpen] = useState(false);
-  const [isAdvertisingModalOpen, setAdvertisingModalOpen] = useState(false);
-  const [isStoreModalOpen, setIsStoreModalOpen] = useState(false);
+  const [redirectInfo, setRedirectInfo] = useState<{ title: string; url: string } | null>(null);
+  const [latestAnnouncement, setLatestAnnouncement] = useState<Announcement | null>(null);
+
+  useEffect(() => {
+    const fetchLatestAnnouncement = async () => {
+        const { data, error } = await supabase
+            .from('announcements')
+            .select('*')
+            .is('user_id', null) // Only public
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+
+        if (error && error.code !== 'PGRST116') { // Ignore 'No rows found' error
+            console.error("Error fetching latest announcement:", error);
+        } else if (data) {
+            setLatestAnnouncement(data);
+        }
+    };
+    fetchLatestAnnouncement();
+  }, []);
+
+  const urls = {
+    events: "https://radiovocearomanilor.com/wp/informatii-utile/evenimente-rvr/",
+    usefulInfo: "https://radiovocearomanilor.com/wp/informatii-utile/",
+    advertising: "https://radiovocearomanilor.com/wp/informatii-utile/publicitate-rvr/",
+    store: "https://radio-vocea-romanilor-1.sumupstore.com/"
+  };
 
   const quickLinks = [
     { key: Page.News, icon: NewsIcon, title: t('navNews'), action: () => setActivePage(Page.News) },
     { key: Page.Sport, icon: SportIcon, title: t('navSport'), action: () => setActivePage(Page.Sport) },
     { key: Page.Weather, icon: WeatherIcon, title: t('homeWeatherTitle'), action: () => setActivePage(Page.Weather) },
-    { key: Page.Events, icon: EventsIcon, title: t('navEvents'), action: () => setEventsModalOpen(true) },
-    { key: Page.UsefulInfo, icon: InfoIcon, title: t('navUsefulInfo'), action: () => setInfoModalOpen(true) },
-    { key: Page.Advertising, icon: AdvertisingIcon, title: t('navAdvertising'), action: () => setAdvertisingModalOpen(true) },
+    { key: Page.Events, icon: EventsIcon, title: t('navEvents'), action: () => setRedirectInfo({ title: t('navEvents'), url: urls.events }) },
+    { key: Page.UsefulInfo, icon: InfoIcon, title: t('navUsefulInfo'), action: () => setRedirectInfo({ title: t('navUsefulInfo'), url: urls.usefulInfo }) },
+    { key: Page.Advertising, icon: AdvertisingIcon, title: t('navAdvertising'), action: () => setRedirectInfo({ title: t('navAdvertising'), url: urls.advertising }) },
   ];
 
   const socialLinks = [
@@ -43,6 +77,20 @@ const HomePage: React.FC<HomePageProps> = ({ setActivePage, isLoggedIn }) => {
         <h1 className="text-2xl font-montserrat text-white/90">{t('homeWelcome_line1')}</h1>
         <h2 className="text-3xl font-bold font-montserrat text-golden-yellow">{t('homeWelcome_line2')}</h2>
       </header>
+      
+      {latestAnnouncement && (
+        <div className="mb-8">
+            <AnnouncementCard announcement={latestAnnouncement}>
+                <button
+                    onClick={() => isLoggedIn ? setActivePage(Page.Profile) : openAuthModal()}
+                    className="mt-4 self-end bg-golden-yellow/20 text-golden-yellow font-bold py-2 px-4 rounded-full hover:bg-golden-yellow/30 transition-colors text-sm flex items-center gap-2"
+                >
+                    {isLoggedIn ? t('homeSeeAllAnnouncements') : t('homeSeeMoreLogin')}
+                    <ChevronRightIcon className="w-5 h-5" />
+                </button>
+            </AnnouncementCard>
+        </div>
+      )}
 
       <div className="space-y-4">
         
@@ -59,7 +107,7 @@ const HomePage: React.FC<HomePageProps> = ({ setActivePage, isLoggedIn }) => {
         
         <div className="pt-6 flex flex-col sm:flex-row items-center justify-center gap-4">
             <button
-                onClick={() => setIsStoreModalOpen(true)}
+                onClick={() => setRedirectInfo({ title: t('homeRvrStore'), url: urls.store })}
                 className="w-full sm:w-auto bg-golden-yellow text-marine-blue font-bold py-3 px-8 rounded-full hover:bg-yellow-400 transition-colors duration-300 flex items-center justify-center gap-2"
             >
                 <StoreIcon className="w-5 h-5" />
@@ -96,10 +144,7 @@ const HomePage: React.FC<HomePageProps> = ({ setActivePage, isLoggedIn }) => {
 
       {isContactModalOpen && <ContactModal onClose={() => setContactModalOpen(false)} />}
       {isDonationModalOpen && <DonationModal onClose={() => setDonationModalOpen(false)} />}
-      {isEventsModalOpen && <InfoModal title={t('navEvents')} url="https://radiovocearomanilor.com/wp/informatii-utile/evenimente-rvr/" onClose={() => setEventsModalOpen(false)} />}
-      {isInfoModalOpen && <InfoModal title={t('navUsefulInfo')} url="https://radiovocearomanilor.com/wp/informatii-utile/" onClose={() => setInfoModalOpen(false)} />}
-      {isAdvertisingModalOpen && <InfoModal title={t('navAdvertising')} url="https://radiovocearomanilor.com/wp/informatii-utile/publicitate-rvr/" onClose={() => setAdvertisingModalOpen(false)} />}
-      {isStoreModalOpen && <StoreRedirectModal onClose={() => setIsStoreModalOpen(false)} />}
+      {redirectInfo && <RedirectModal title={redirectInfo.title} url={redirectInfo.url} onClose={() => setRedirectInfo(null)} />}
     </div>
   );
 };
