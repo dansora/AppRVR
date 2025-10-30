@@ -172,7 +172,7 @@ const App: React.FC = () => {
       case Page.Weather:
         return <WeatherPage setActivePage={setActivePage} />;
       case Page.Upload:
-        return <UploadContent isLoggedIn={isLoggedIn} openAuthModal={() => setAuthModalOpen(true)} />;
+        return <UploadContent isLoggedIn={isLoggedIn} openAuthModal={() => setAuthModalOpen(true)} setActivePage={setActivePage} />;
       case Page.Polls:
         return <Polls />;
       case Page.Settings:

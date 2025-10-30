@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
-import { UploadIcon, UserIcon, WhatsAppIcon } from './Icons';
+import { UploadIcon, UserIcon, WhatsAppIcon, CheckCircleIcon, EditIcon } from './Icons';
 import { useProfile } from '../contexts/ProfileContext';
 import { supabase } from '../services/supabaseClient';
+import { Page } from '../types';
 
 interface UploadContentProps {
     isLoggedIn: boolean;
     openAuthModal: () => void;
+    setActivePage: (page: Page) => void;
 }
 
-const UploadContent: React.FC<UploadContentProps> = ({ isLoggedIn, openAuthModal }) => {
+const UploadContent: React.FC<UploadContentProps> = ({ isLoggedIn, openAuthModal, setActivePage }) => {
   const { t } = useLanguage();
   const { session, profile, loadingProfile } = useProfile();
   const [file, setFile] = useState<File | null>(null);
@@ -87,7 +89,10 @@ const UploadContent: React.FC<UploadContentProps> = ({ isLoggedIn, openAuthModal
 
     } catch (err: any) {
       console.error('Submission error:', err);
-      const errorMessage = err.message || (typeof err === 'object' && err !== null ? JSON.stringify(err) : String(err));
+      let errorMessage = err.message || (typeof err === 'object' && err !== null ? JSON.stringify(err) : String(err));
+      if (typeof errorMessage === 'string' && errorMessage.includes("user_submissions")) {
+        errorMessage = t('uploadErrorFeatureUnavailable');
+      }
       setSubmitStatus('error');
       setSubmitMessage(errorMessage || t('uploadError'));
     } finally {
@@ -129,9 +134,16 @@ const UploadContent: React.FC<UploadContentProps> = ({ isLoggedIn, openAuthModal
       <div className="max-w-xl mx-auto bg-marine-blue-darker p-6 rounded-lg shadow-md">
         <h2 className="text-xl font-montserrat text-white mb-4 text-center">{t('uploadFormTitle')}</h2>
         {submitStatus === 'success' ? (
-          <div className="text-center p-4 bg-green-500/20 text-green-300 rounded-md">
-            {submitMessage}
-          </div>
+            <div className="text-center p-4 bg-green-500/20 text-green-300 rounded-lg border-l-4 border-green-500 flex flex-col items-center gap-4">
+                <CheckCircleIcon className="w-12 h-12 text-green-400" />
+                <p className="font-semibold text-lg">{submitMessage}</p>
+                <button
+                    onClick={() => { setSubmitStatus(null); setSubmitMessage(null); }}
+                    className="mt-2 bg-golden-yellow/80 text-marine-blue-darkest font-bold py-2 px-6 rounded-full hover:bg-golden-yellow"
+                >
+                    {t('uploadAnother')}
+                </button>
+            </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
              {submitStatus === 'error' && (
@@ -140,12 +152,20 @@ const UploadContent: React.FC<UploadContentProps> = ({ isLoggedIn, openAuthModal
                 </div>
              )}
 
-            <div className="p-4 bg-marine-blue-darkest/50 rounded-md border-l-4 border-golden-yellow">
-                <p className="text-sm font-medium text-white/80 mb-1">{t('uploadSubmittingAs')}:</p>
-                <p className="font-bold text-white text-lg">{`${profile?.first_name || ''} ${profile?.last_name || ''}`.trim() || profile?.username}</p>
-                <p className="text-xs text-white/70">{session?.user?.email}</p>
-                {profile?.phone_number && <p className="text-xs text-white/70 mt-1">{profile.phone_number}</p>}
-            </div>
+            <button
+                type="button"
+                onClick={() => setActivePage(Page.Profile)}
+                className="w-full p-4 bg-marine-blue-darkest/50 rounded-md border-l-4 border-golden-yellow text-left hover:bg-marine-blue-darkest transition-colors flex justify-between items-center"
+            >
+                <div>
+                    <p className="text-sm font-medium text-white/80 mb-1">{t('uploadSubmittingAs')}:</p>
+                    <p className="font-bold text-white text-lg">{`${profile?.first_name || ''} ${profile?.last_name || ''}`.trim() || profile?.username}</p>
+                    <p className="text-xs text-white/70">{session?.user?.email}</p>
+                    {profile?.phone_number && <p className="text-xs text-white/70 mt-1">{profile.phone_number}</p>}
+                </div>
+                <EditIcon className="w-6 h-6 text-white/70 flex-shrink-0 ml-4" />
+            </button>
+
 
             <div>
               <label className="block text-sm font-medium text-white/80 mb-1">{t('uploadFormMessage')}</label>

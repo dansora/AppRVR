@@ -10,22 +10,39 @@ interface AvatarProps {
 
 const Avatar: React.FC<AvatarProps> = ({ path, onUpload, uploading }) => {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (path) {
       const { data } = supabase.storage.from('avatars').getPublicUrl(path);
       setAvatarUrl(data.publicUrl);
+      setPreviewUrl(null); // Clear preview when new path comes from props
     } else {
       setAvatarUrl(null);
     }
   }, [path]);
 
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files.length > 0) {
+      const file = event.target.files[0];
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreviewUrl(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+    // Propagate the event to the parent for the actual upload logic
+    onUpload(event);
+  };
+
+  const displayUrl = previewUrl || (avatarUrl ? `${avatarUrl}?t=${new Date().getTime()}` : null);
+
   return (
     <div className="relative w-32 h-32 mx-auto mb-6">
       <div className="w-32 h-32 rounded-full bg-marine-blue-darkest/50 flex items-center justify-center overflow-hidden border-4 border-golden-yellow">
-        {avatarUrl ? (
+        {displayUrl ? (
           <img
-            src={`${avatarUrl}?t=${new Date().getTime()}`} // Cache busting
+            src={displayUrl}
             alt="Avatar"
             className="object-cover w-full h-full"
           />
@@ -51,7 +68,7 @@ const Avatar: React.FC<AvatarProps> = ({ path, onUpload, uploading }) => {
         type="file"
         id="single"
         accept="image/*"
-        onChange={onUpload}
+        onChange={handleFileChange}
         disabled={uploading}
       />
     </div>

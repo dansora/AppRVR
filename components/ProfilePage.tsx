@@ -5,6 +5,7 @@ import { Page } from '../types';
 import Avatar from './Avatar';
 import Announcements from './Announcements';
 import { useProfile } from '../contexts/ProfileContext';
+import { CheckCircleIcon, InfoIcon } from './Icons';
 
 interface ProfilePageProps {
   setActivePage: (page: Page) => void;
@@ -99,7 +100,9 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ setActivePage }) => {
       setMessage(null);
 
       if (!event.target.files || event.target.files.length === 0) {
-        throw new Error('You must select an image to upload.');
+        // Don't throw error if user cancels file selection, just exit.
+        setUploading(false);
+        return;
       }
 
       const user = session.user;
@@ -191,8 +194,16 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ setActivePage }) => {
               uploading={uploading}
             />
             {message && (
-                <div className={`p-3 rounded-md text-center ${message.type === 'success' ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'}`}>
-                    {message.text}
+                <div className={`p-4 rounded-lg flex items-center gap-4 ${
+                    message.type === 'success' 
+                        ? 'bg-green-500/20 text-green-300 border-l-4 border-green-500' 
+                        : 'bg-red-500/20 text-red-300 border-l-4 border-red-500'
+                }`}>
+                    {message.type === 'success' 
+                        ? <CheckCircleIcon className="w-6 h-6 flex-shrink-0" />
+                        : <InfoIcon className="w-6 h-6 flex-shrink-0" />
+                    }
+                    <span className="font-medium">{message.text}</span>
                 </div>
             )}
             <form onSubmit={updateProfile} className="space-y-4">
