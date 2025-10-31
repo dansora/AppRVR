@@ -16,8 +16,12 @@ interface RssFeedState {
   refetch: () => Promise<void>;
 }
 
-const CORS_PROXY_URL = "https://api.allorigins.win/raw?url=";
-const FETCH_TIMEOUT = 15000; // Increased to 15 seconds
+// Array of CORS proxies to try in order.
+const CORS_PROXIES = [
+    "https://api.allorigins.win/raw?url=",
+    "https://corsproxy.io/?", // Fallback proxy
+];
+const FETCH_TIMEOUT = 15000; // 15 seconds
 
 const useRssFeed = (feedUrl: string, limit: number = 10): RssFeedState => {
   const cacheKey = `rvr-rss-cache-${feedUrl}`;
@@ -38,69 +42,86 @@ const useRssFeed = (feedUrl: string, limit: number = 10): RssFeedState => {
   const fetchFeed = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
 
-    try {
-      const response = await fetch(`${CORS_PROXY_URL}${encodeURIComponent(feedUrl)}`, {
-        signal: controller.signal,
-      });
+    let lastError: Error | null = null;
 
-      clearTimeout(timeoutId);
+    for (const proxyUrl of CORS_PROXIES) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const text = await response.text();
-      const parser = new DOMParser();
-      const xml = parser.parseFromString(text, 'text/xml');
-      
-      const errorNode = xml.querySelector('parsererror');
-      if (errorNode) {
-          throw new Error('Failed to parse XML');
-      }
+        try {
+            const fetchUrl = `${proxyUrl}${encodeURIComponent(feedUrl)}`;
+            const response = await fetch(fetchUrl, {
+                signal: controller.signal,
+            });
 
-      const newItems = Array.from(xml.querySelectorAll('item')).slice(0, limit).map(item => {
-        const description = item.querySelector('description')?.textContent || '';
-        const doc = parser.parseFromString(`<!doctype html><body>${description}`, 'text/html');
-        const imageUrl = doc.querySelector('img')?.src;
+            clearTimeout(timeoutId);
 
-        return {
-          title: item.querySelector('title')?.textContent || '',
-          link: item.querySelector('link')?.textContent || '',
-          pubDate: item.querySelector('pubDate')?.textContent || '',
-          description: doc.body.textContent?.trim() || '',
-          content: item.querySelector('content\\:encoded, encoded')?.textContent || '',
-          imageUrl: imageUrl,
-        };
-      });
-      setItems(newItems);
-      try {
-        localStorage.setItem(cacheKey, JSON.stringify(newItems));
-      } catch (cacheError) {
-        console.error("Failed to cache RSS feed:", cacheError);
-      }
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
 
-    } catch (err) {
-      if ((err as Error).name === 'AbortError') {
-        const timeoutError = new Error('Request timed out. The server took too long to respond.');
-        console.error("Failed to fetch RSS feed:", timeoutError);
-        setError(timeoutError);
-      } else {
-        console.error("Failed to fetch RSS feed:", err);
-        setError(err as Error);
-      }
-    } finally {
-      clearTimeout(timeoutId);
-      setLoading(false);
+            const text = await response.text();
+            const parser = new DOMParser();
+            const xml = parser.parseFromString(text, 'text/xml');
+            
+            const errorNode = xml.querySelector('parsererror');
+            if (errorNode) {
+                throw new Error('Failed to parse XML. Proxy might be down or blocked.');
+            }
+
+            const newItems = Array.from(xml.querySelectorAll('item')).slice(0, limit).map(item => {
+                const description = item.querySelector('description')?.textContent || '';
+                const doc = parser.parseFromString(`<!doctype html><body>${description}`, 'text/html');
+                const imageUrl = doc.querySelector('img')?.src;
+
+                return {
+                    title: item.querySelector('title')?.textContent || '',
+                    link: item.querySelector('link')?.textContent || '',
+                    pubDate: item.querySelector('pubDate')?.textContent || '',
+                    description: doc.body.textContent?.trim() || '',
+                    content: item.querySelector('content\\:encoded, encoded')?.textContent || '',
+                    imageUrl: imageUrl,
+                };
+            });
+            
+            if (newItems.length > 0) {
+                setItems(newItems);
+                try {
+                    localStorage.setItem(cacheKey, JSON.stringify(newItems));
+                } catch (cacheError) {
+                    console.error("Failed to cache RSS feed:", cacheError);
+                }
+                
+                // Success, break the loop
+                setLoading(false);
+                return;
+            } else {
+                 throw new Error("No items found in RSS feed response.");
+            }
+
+        } catch (err) {
+            if ((err as Error).name === 'AbortError') {
+                lastError = new Error('Request timed out. The server took too long to respond.');
+            } else {
+                lastError = err as Error;
+            }
+            console.warn(`Failed to fetch via ${proxyUrl}. Trying next...`, lastError);
+        } finally {
+            clearTimeout(timeoutId);
+        }
     }
+
+    // If all proxies failed, set the final error
+    console.error("Failed to fetch RSS feed from all proxies:", lastError);
+    setError(lastError);
+    setLoading(false);
   }, [feedUrl, limit, cacheKey]);
 
   useEffect(() => {
     if (feedUrl) {
       fetchFeed();
     }
-  // This is intentional, we only want it to run on mount or when feedUrl changes.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [feedUrl]);
 
