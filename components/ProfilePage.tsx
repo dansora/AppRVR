@@ -6,6 +6,7 @@ import Avatar from './Avatar';
 import Announcements from './Announcements';
 import { useProfile } from '../contexts/ProfileContext';
 import { CheckCircleIcon, InfoIcon } from './Icons';
+import AdCarousel from './AdCarousel';
 
 interface ProfilePageProps {
   setActivePage: (page: Page) => void;
@@ -272,6 +273,10 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ setActivePage }) => {
                     {t('deleteAccountButton')}
                 </button>
             </div>
+        </div>
+
+        <div className="my-8">
+            <AdCarousel />
         </div>
 
         <div className="mt-8">

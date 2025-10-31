@@ -7,6 +7,7 @@ import DonationModal from './DonationModal';
 import RedirectModal from './RedirectModal';
 import { supabase } from '../services/supabaseClient';
 import AnnouncementCard from './AnnouncementCard';
+import AdCarousel from './AdCarousel';
 
 interface HomePageProps {
   setActivePage: (page: Page) => void;
@@ -91,6 +92,10 @@ const HomePage: React.FC<HomePageProps> = ({ setActivePage, isLoggedIn, openAuth
             </AnnouncementCard>
         </div>
       )}
+
+      <div className="mb-8">
+        <AdCarousel />
+      </div>
 
       <div className="space-y-4">
         

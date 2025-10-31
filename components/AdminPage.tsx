@@ -4,10 +4,11 @@ import AdminDashboard from './admin/AdminDashboard';
 import AnnouncementsManager from './admin/AnnouncementsManager';
 import PollsManager from './admin/PollsManager';
 import UserSubmissionsManager from './admin/UserSubmissionsManager';
+import AdvertisingManager from './admin/AdvertisingManager';
 
 const AdminPage: React.FC = () => {
   const { t } = useLanguage();
-  const [view, setView] = useState<'dashboard' | 'announcements' | 'polls' | 'submissions'>('dashboard');
+  const [view, setView] = useState<'dashboard' | 'announcements' | 'polls' | 'submissions' | 'advertising'>('dashboard');
 
   const getTitle = () => {
     switch (view) {
@@ -17,6 +18,8 @@ const AdminPage: React.FC = () => {
         return t('adminPollsDashboardTitle');
       case 'submissions':
         return t('userSubmissionsTitle');
+      case 'advertising':
+        return t('adminAdvertisingPageTitle');
       case 'dashboard':
       default:
         return t('adminPanelTitle');
@@ -31,6 +34,8 @@ const AdminPage: React.FC = () => {
         return <PollsManager onBack={() => setView('dashboard')} />;
       case 'submissions':
         return <UserSubmissionsManager onBack={() => setView('dashboard')} />;
+      case 'advertising':
+        return <AdvertisingManager onBack={() => setView('dashboard')} />;
       case 'dashboard':
       default:
         return <AdminDashboard setView={setView} />;
