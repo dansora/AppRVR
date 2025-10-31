@@ -9,13 +9,13 @@
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "https://via.placeholder.com/192.png?text=RVR",
+      "src": "https://placehold.co/192x192/003366/FFC107?text=RVR",
       "type": "image/png",
       "sizes": "192x192",
       "purpose": "any maskable"
     },
     {
-      "src": "https://via.placeholder.com/512.png?text=RVR",
+      "src": "https://placehold.co/512x512/003366/FFC107?text=RVR",
       "type": "image/png",
       "sizes": "512x512",
       "purpose": "any maskable"
