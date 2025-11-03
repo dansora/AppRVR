@@ -1,9 +1,15 @@
-[{
-  "relation": ["delegate_permission/common.handle_all_urls"],
-  "target": {
-    "namespace": "android_app",
-    "package_name": "com.rvr.app",
-    "sha256_cert_fingerprints":
-    ["1D:63:ED:B7:78:E0:44:F9:CD:DE:A5:08:08:FE:B2:E4:5C:E7:11:A3:03:4A:19:51:3F:8A:80:8F:EB:19:DF:94"]
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls",
+      "delegate_permission/common.get_login_creds"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "app.netlify.app_rvr.twa",
+      "sha256_cert_fingerprints": [
+        "1D:63:ED:B7:78:E0:44:F9:CD:DE:A5:08:08:FE:B2:E4:5C:E7:11:A3:03:4A:19:51:3F:8A:80:8F:EB:19:DF:94"
+      ]
+    }
   }
-}]
+]
