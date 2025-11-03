@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../services/supabaseClient';
 import { useProfile } from '../contexts/ProfileContext';
 import { BarChartIcon } from './Icons';
+import PollResults from './PollResults';
 
 interface PollOption {
   id: number;
@@ -27,7 +28,7 @@ interface PollResult extends Poll {
 const Polls: React.FC = () => {
   const { t } = useLanguage();
   const { session } = useProfile();
-  const [activePolls, setActivePolls] = useState<Poll[]>([]);
+  const [activePolls, setActivePolls] = useState<PollResult[]>([]);
   const [completedPolls, setCompletedPolls] = useState<PollResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -56,64 +57,72 @@ const Polls: React.FC = () => {
     loadVotedPolls();
   }, [session]);
 
-  useEffect(() => {
-    const fetchPolls = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const now = new Date().toISOString();
-        
-        // Fetch active polls with their options
-        const { data: activeData, error: activeError } = await supabase
-          .from('polls')
-          .select('*, poll_options(*)')
-          .lte('start_date', now)
-          .gte('end_date', now)
-          .order('end_date', { ascending: true });
+  const fetchPolls = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const now = new Date().toISOString();
+      
+      const processPolls = async (polls: Poll[] | null): Promise<PollResult[]> => {
+          if (!polls) return [];
+          return Promise.all(
+              polls.map(async (poll) => {
+                  const { data: votes, error: votesError } = await supabase
+                      .from('poll_votes')
+                      .select('poll_option_id')
+                      .eq('poll_id', poll.id);
 
-        if (activeError) throw activeError;
-        setActivePolls(activeData || []);
+                  if (votesError) throw votesError;
 
-        // Fetch last 3 completed and published polls
-        const { data: completedData, error: completedError } = await supabase
-          .from('polls')
-          .select('*, poll_options(*)')
-          .eq('is_published', true)
-          .lte('end_date', now)
-          .order('end_date', { ascending: false })
-          .limit(3);
+                  const total_votes = votes.length;
+                  const results = poll.poll_options.map(option => {
+                      const count = votes.filter(v => v.poll_option_id === option.id).length;
+                      return { option_id: option.id, count, text: option.option_text };
+                  });
+                  return { ...poll, results, total_votes };
+              })
+          );
+      };
 
-        if (completedError) throw completedError;
+      // Fetch active polls
+      const { data: activeData, error: activeError } = await supabase
+        .from('polls')
+        .select('*, poll_options(*)')
+        .lte('start_date', now)
+        .gte('end_date', now)
+        .order('end_date', { ascending: true });
+      if (activeError) throw activeError;
 
-        // Fetch results for completed polls
-        const completedWithResults: PollResult[] = await Promise.all(
-          (completedData || []).map(async (poll) => {
-            const { data: votes, error: votesError } = await supabase
-              .from('poll_votes')
-              .select('poll_option_id')
-              .eq('poll_id', poll.id);
+      // Fetch completed and published polls
+      const { data: completedData, error: completedError } = await supabase
+        .from('polls')
+        .select('*, poll_options(*)')
+        .eq('is_published', true)
+        .lte('end_date', now)
+        .order('end_date', { ascending: false })
+        .limit(5);
+      if (completedError) throw completedError;
 
-            if (votesError) throw votesError;
+      const [activeWithResults, completedWithResults] = await Promise.all([
+          processPolls(activeData),
+          processPolls(completedData)
+      ]);
 
-            const total_votes = votes.length;
-            const results = poll.poll_options.map(option => {
-              const count = votes.filter(v => v.poll_option_id === option.id).length;
-              return { option_id: option.id, count, text: option.option_text };
-            });
-            return { ...poll, results, total_votes };
-          })
-        );
-        setCompletedPolls(completedWithResults);
+      setActivePolls(activeWithResults);
+      setCompletedPolls(completedWithResults);
 
-      } catch (err: any) {
-        setError(t('newsError'));
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchPolls();
+    } catch (err: any) {
+      setError(t('newsError'));
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   }, [t]);
+
+  useEffect(() => {
+    fetchPolls();
+  }, [session, fetchPolls]);
+
 
   const handleVote = async (pollId: number, optionId: number) => {
     setMessage(null);
@@ -151,8 +160,6 @@ const Polls: React.FC = () => {
     if (error) {
         if (error.code === '23505') { // unique_violation code
             setMessage({ pollId, text: t('alreadyVoted') });
-            // Sync state in case of race condition (e.g., voted in another tab)
-            setVotedPolls(prev => new Set(prev).add(pollId));
         } else {
             setMessage({ pollId, text: t('newsError') });
             console.error(error);
@@ -160,9 +167,9 @@ const Polls: React.FC = () => {
     } else {
         const newVotedPolls = new Set(votedPolls).add(pollId);
         setVotedPolls(newVotedPolls);
-        setMessage({ pollId, text: t('voteSubmitted') });
+        fetchPolls(); // Refresh to show results
 
-        if(!session) { // Only use local storage for anonymous
+        if(!session) {
             const locallyVotedRaw = localStorage.getItem('rvr-voted-polls');
             const locallyVoted = locallyVotedRaw ? JSON.parse(locallyVotedRaw) : [];
             if (!locallyVoted.includes(pollId)) {
@@ -176,20 +183,23 @@ const Polls: React.FC = () => {
   const publicPolls = activePolls.filter(p => p.target_audience === 'all');
   const memberPolls = activePolls.filter(p => p.target_audience === 'registered');
 
+  const publicCompletedPolls = completedPolls.filter(p => p.target_audience === 'all');
+  const memberCompletedPolls = completedPolls.filter(p => p.target_audience === 'registered');
+
   return (
     <div className="p-4 text-white font-roboto pb-20">
       <h1 className="text-3xl font-montserrat text-golden-yellow mb-6">{t('navPolls')}</h1>
       
       {loading ? <p>{t('newsLoading')}</p> : error ? <p className="text-red-400">{error}</p> : (
         <div className="space-y-8">
-            {/* Active Public Polls */}
+            {/* Active Polls Section */}
             <div>
-                <h2 className="text-2xl font-montserrat text-white mb-4">{t('publicPolls')}</h2>
+                {publicPolls.length > 0 && <h2 className="text-2xl font-montserrat text-white mb-4">{t('publicPolls')}</h2>}
                 {publicPolls.length > 0 ? publicPolls.map(poll => (
                     <div key={poll.id} className="bg-marine-blue-darker p-6 rounded-lg shadow-md mb-4">
                         <h3 className="text-xl font-montserrat text-white mb-4">{poll.question}</h3>
                         {votedPolls.has(poll.id) ? (
-                            <p className="text-sm text-golden-yellow mt-4 text-center">{message?.pollId === poll.id ? message.text : t('alreadyVoted')}</p>
+                           <PollResults poll={poll} />
                         ) : (
                             <div className="space-y-3">
                                 {poll.poll_options.map(option => (
@@ -197,68 +207,71 @@ const Polls: React.FC = () => {
                                         {option.option_text}
                                     </button>
                                 ))}
+                                <p className="text-xs text-center text-white/70 pt-2">{t('voteToSeeResults')}</p>
                                 {message && message.pollId === poll.id && <p className="text-sm text-golden-yellow mt-2 text-center">{message.text}</p>}
                             </div>
                         )}
                         <p className="text-xs text-white/50 mt-4 text-right">{t('pollEndsOn', { date: new Date(poll.end_date).toLocaleDateString() })}</p>
                     </div>
                 )) : <p className="text-white/70">{t('noActivePollsPublic')}</p>}
+
+                {session && memberPolls.length > 0 && (
+                    <div className="mt-8">
+                        <h2 className="text-2xl font-montserrat text-white mb-4">{t('memberPolls')}</h2>
+                        {memberPolls.map(poll => (
+                            <div key={poll.id} className="bg-marine-blue-darker p-6 rounded-lg shadow-md mb-4 border-l-4 border-golden-yellow">
+                                <h3 className="text-xl font-montserrat text-white mb-4">{poll.question}</h3>
+                                {votedPolls.has(poll.id) ? (
+                                    <PollResults poll={poll} />
+                                ) : (
+                                    <div className="space-y-3">
+                                        {poll.poll_options.map(option => (
+                                            <button key={option.id} onClick={() => handleVote(poll.id, option.id)} className="w-full bg-marine-blue-darkest/50 p-3 rounded-md text-left text-white hover:bg-marine-blue-darkest transition-colors">
+                                                {option.option_text}
+                                            </button>
+                                        ))}
+                                        <p className="text-xs text-center text-white/70 pt-2">{t('voteToSeeResults')}</p>
+                                        {message && message.pollId === poll.id && <p className="text-sm text-golden-yellow mt-2 text-center">{message.text}</p>}
+                                    </div>
+                                )}
+                                <p className="text-xs text-white/50 mt-4 text-right">{t('pollEndsOn', { date: new Date(poll.end_date).toLocaleDateString() })}</p>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
 
-            {/* Active Member Polls */}
-            {session && memberPolls.length > 0 && (
-                <div>
-                    <h2 className="text-2xl font-montserrat text-white mb-4">{t('memberPolls')}</h2>
-                    {memberPolls.map(poll => (
-                        <div key={poll.id} className="bg-marine-blue-darker p-6 rounded-lg shadow-md mb-4 border-l-4 border-golden-yellow">
-                            <h3 className="text-xl font-montserrat text-white mb-4">{poll.question}</h3>
-                            {votedPolls.has(poll.id) ? (
-                                <p className="text-sm text-golden-yellow mt-4 text-center">{message?.pollId === poll.id ? message.text : t('alreadyVoted')}</p>
-                            ) : (
-                                <div className="space-y-3">
-                                    {poll.poll_options.map(option => (
-                                        <button key={option.id} onClick={() => handleVote(poll.id, option.id)} className="w-full bg-marine-blue-darkest/50 p-3 rounded-md text-left text-white hover:bg-marine-blue-darkest transition-colors">
-                                            {option.option_text}
-                                        </button>
-                                    ))}
-                                    {message && message.pollId === poll.id && <p className="text-sm text-golden-yellow mt-2 text-center">{message.text}</p>}
-                                </div>
-                            )}
-                            <p className="text-xs text-white/50 mt-4 text-right">{t('pollEndsOn', { date: new Date(poll.end_date).toLocaleDateString() })}</p>
-                        </div>
-                    ))}
-                </div>
-            )}
-
-            {/* Recent Results */}
+            {/* Completed Polls Section */}
             <div>
                 <h2 className="text-2xl font-montserrat text-white mb-4 flex items-center gap-2">
                     <BarChartIcon className="w-6 h-6" />
                     {t('recentResults')}
                 </h2>
-                {completedPolls.length > 0 ? (
-                    <div className="space-y-6">
-                        {completedPolls.map(poll => (
-                            <div key={poll.id} className="bg-marine-blue-darker p-6 rounded-lg shadow-md">
-                                <h3 className="text-xl font-montserrat text-white mb-1">{poll.question}</h3>
-                                <p className="text-xs text-white/60 mb-4">{t('totalVotes')}: {poll.total_votes}</p>
-                                <div className="space-y-2">
-                                    {poll.results.map((res) => (
-                                        <div key={res.option_id}>
-                                            <div className="flex justify-between text-white/90 mb-1 text-sm">
-                                                <span>{res.text}</span>
-                                                <span>{poll.total_votes > 0 ? ((res.count / poll.total_votes) * 100).toFixed(0) : 0}%</span>
-                                            </div>
-                                            <div className="w-full bg-marine-blue-darkest/50 rounded-full h-2.5">
-                                                <div className="bg-golden-yellow h-2.5 rounded-full" style={{ width: `${poll.total_votes > 0 ? (res.count / poll.total_votes) * 100 : 0}%` }}></div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        ))}
+                {publicCompletedPolls.length > 0 && publicCompletedPolls.map(poll => (
+                    <div key={poll.id} className="bg-marine-blue-darker p-6 rounded-lg shadow-md mb-4">
+                        <h3 className="text-xl font-montserrat text-white mb-1">{poll.question}</h3>
+                        <p className="text-xs text-white/60 mb-4">{t('pollEndedOn', { date: new Date(poll.end_date).toLocaleDateString() })} - {t('finalResults')}</p>
+                        <PollResults poll={poll} />
                     </div>
-                ) : <p className="text-white/70">{t('noPollResultsPublic')}</p>}
+                ))}
+                
+                {session && memberCompletedPolls.length > 0 && memberCompletedPolls.map(poll => (
+                    <div key={poll.id} className="bg-marine-blue-darker p-6 rounded-lg shadow-md mb-4 border-l-4 border-golden-yellow">
+                        <h3 className="text-xl font-montserrat text-white mb-1">{poll.question}</h3>
+                        <p className="text-xs text-white/60 mb-4">{t('pollEndedOn', { date: new Date(poll.end_date).toLocaleDateString() })} - {t('finalResults')}</p>
+                        <PollResults poll={poll} />
+                    </div>
+                ))}
+
+                {!session && memberCompletedPolls.length > 0 && (
+                    <div className="bg-marine-blue-darker p-4 rounded-lg text-center text-sm text-white/80">
+                        <p>{t('memberPollsResultsInfo')}</p>
+                    </div>
+                )}
+
+                {publicCompletedPolls.length === 0 && memberCompletedPolls.length === 0 && (
+                    <p className="text-white/70">{t('noPollResultsPublic')}</p>
+                )}
             </div>
         </div>
       )}
