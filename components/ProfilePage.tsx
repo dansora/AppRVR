@@ -7,12 +7,14 @@ import Announcements from './Announcements';
 import { useProfile } from '../contexts/ProfileContext';
 import { CheckCircleIcon, InfoIcon } from './Icons';
 import AdCarousel from './AdCarousel';
+import ContestCarousel from './ContestCarousel';
 
 interface ProfilePageProps {
   setActivePage: (page: Page) => void;
+  openAuthModal: () => void;
 }
 
-const ProfilePage: React.FC<ProfilePageProps> = ({ setActivePage }) => {
+const ProfilePage: React.FC<ProfilePageProps> = ({ setActivePage, openAuthModal }) => {
   const { t } = useLanguage();
   const { session, profile, loadingProfile, refetchProfile, profileError } = useProfile();
   
@@ -281,6 +283,10 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ setActivePage }) => {
 
         <div className="mt-8">
             <Announcements userId={session.user.id} />
+        </div>
+        
+        <div className="mt-8">
+            <ContestCarousel setActivePage={setActivePage} openAuthModal={openAuthModal} />
         </div>
     </div>
   );

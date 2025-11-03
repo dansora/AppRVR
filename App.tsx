@@ -178,7 +178,7 @@ const App: React.FC = () => {
       case Page.Settings:
         return <SettingsPage onReviewTerms={() => setIsConsentModalOpen(true)} isLoggedIn={isLoggedIn} />;
       case Page.Profile:
-        return <ProfilePage setActivePage={setActivePage} />;
+        return <ProfilePage setActivePage={setActivePage} openAuthModal={() => setAuthModalOpen(true)} />;
       case Page.Admin:
         // Secure this page view
         return profile?.role === 'admin' ? <AdminPage /> : <HomePage setActivePage={setActivePage} isLoggedIn={isLoggedIn} openAuthModal={() => setAuthModalOpen(true)} />;
