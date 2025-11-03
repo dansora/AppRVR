@@ -36,7 +36,7 @@ const BottomNav: React.FC<BottomNavProps> = ({ activePage, setActivePage, isLogg
   const baseNavItems = [
     { icon: HomeIcon, label: t('navHome'), page: Page.Home },
     { icon: NewsIcon, label: t('navNews'), page: Page.News },
-    { icon: UploadIcon, label: t('navUpload'), page: Page.Upload },
+    { icon: UploadIcon, label: t('navSocial'), page: Page.Upload },
     { icon: PollIcon, label: t('navPolls'), page: Page.Polls },
   ];
   

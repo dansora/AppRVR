@@ -1,9 +1,9 @@
 import React from 'react';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { NewsIcon, PollIcon, ChevronRightIcon, DatabaseIcon, AdvertisingIcon } from '../Icons';
+import { NewsIcon, PollIcon, ChevronRightIcon, DatabaseIcon, AdvertisingIcon, TrophyIcon } from '../Icons';
 
 interface AdminDashboardProps {
-  setView: (view: 'dashboard' | 'announcements' | 'polls' | 'submissions' | 'advertising') => void;
+  setView: (view: 'dashboard' | 'announcements' | 'polls' | 'submissions' | 'advertising' | 'contests') => void;
 }
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ setView }) => {
@@ -40,6 +40,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ setView }) => {
       description: t('adminAdvertisingDesc'),
       icon: AdvertisingIcon,
       action: () => setView('advertising'),
+      enabled: true,
+    },
+     {
+      key: 'contests',
+      title: t('adminContestsTitle'),
+      description: t('adminContestsDesc'),
+      icon: TrophyIcon,
+      action: () => setView('contests'),
       enabled: true,
     },
   ];
