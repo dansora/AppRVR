@@ -9,6 +9,9 @@ interface Advertisement {
   media_url: string;
   media_type: 'image' | 'video';
   link_url: string;
+  // Adăugăm câmpurile de dată ca opționale pentru a gestiona grațios schema veche a bazei de date.
+  start_date?: string | null;
+  end_date?: string | null;
 }
 
 const AdCarousel: React.FC = () => {
@@ -20,19 +23,42 @@ const AdCarousel: React.FC = () => {
   useEffect(() => {
     const fetchAds = async () => {
       setLoading(true);
+      const now = new Date().toISOString();
+      let finalAds: Advertisement[] = [];
+
+      // Încercăm să preluăm reclamele folosind noile coloane pentru programare bazată pe dată.
       const { data, error } = await supabase
         .from('advertisements')
-        .select('id, title, text, media_url, media_type, link_url')
+        .select('*')
         .eq('is_active', true)
+        .lte('start_date', now)
+        .gte('end_date', now)
         .order('created_at', { ascending: false });
 
       if (error) {
-        // Log the error for debugging but don't show it to the user.
-        // The component will just not render if there's an issue.
-        console.error('Error fetching ads:', error.message);
+        // Dacă eroarea indică lipsa coloanelor, revenim la metoda veche de interogare.
+        if (error.code === '42703') { // 'undefined_column'
+          console.warn('Tabelul de reclame pare neactualizat. Se revine la preluarea reclamelor active fără programare pe date. Vă rugăm să actualizați schema bazei de date conform instrucțiunilor din panoul de administrare.');
+          const { data: fallbackData, error: fallbackError } = await supabase
+            .from('advertisements')
+            .select('id, title, text, media_url, media_type, link_url')
+            .eq('is_active', true)
+            .order('created_at', { ascending: false });
+          
+          if (fallbackError) {
+            console.error('Eroare la preluarea reclamelor (fallback):', fallbackError.message);
+          } else {
+            finalAds = fallbackData || [];
+          }
+        } else {
+          // Pentru alte erori, le înregistrăm în consolă.
+          console.error('Eroare la preluarea reclamelor:', error.message);
+        }
       } else {
-        setAds(data || []);
+        finalAds = data || [];
       }
+      
+      setAds(finalAds);
       setLoading(false);
     };
 

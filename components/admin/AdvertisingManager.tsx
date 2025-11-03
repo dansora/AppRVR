@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../services/supabaseClient';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { BackIcon, UploadIcon, ChevronRightIcon } from '../Icons';
+import { BackIcon, UploadIcon, ChevronRightIcon, EditIcon } from '../Icons';
+import EditAdModal from './EditAdModal';
 
 interface Advertisement {
   id: number;
@@ -12,6 +13,8 @@ interface Advertisement {
   media_type: 'image' | 'video';
   link_url: string;
   is_active: boolean;
+  start_date: string | null;
+  end_date: string | null;
 }
 
 interface AdvertisingManagerProps {
@@ -29,9 +32,12 @@ const AdvertisingManager: React.FC<AdvertisingManagerProps> = ({ onBack }) => {
   const [newText, setNewText] = useState('');
   const [newLink, setNewLink] = useState('');
   const [newMediaFile, setNewMediaFile] = useState<File | null>(null);
+  const [newStartDate, setNewStartDate] = useState('');
+  const [newEndDate, setNewEndDate] = useState('');
   const [mediaPreview, setMediaPreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [tableExists, setTableExists] = useState<boolean | null>(null);
+  const [editingAd, setEditingAd] = useState<Advertisement | null>(null);
 
   const fetchAds = useCallback(async () => {
     setLoading(true);
@@ -41,7 +47,7 @@ const AdvertisingManager: React.FC<AdvertisingManagerProps> = ({ onBack }) => {
       .order('created_at', { ascending: false });
 
     if (error) {
-      if (error.code === '42P01') { // "undefined_table" error code
+      if (error.code === '42P01' || error.code === '42703') { // undefined_table or undefined_column
         setTableExists(false);
       } else {
         setMessage({ type: 'error', text: `${t('newsError')}: ${error.message}` });
@@ -72,8 +78,12 @@ const AdvertisingManager: React.FC<AdvertisingManagerProps> = ({ onBack }) => {
 
   const handleCreateAd = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMediaFile) {
-        setMessage({ type: 'error', text: 'Media file is required.' });
+    if (!newMediaFile || !newStartDate || !newEndDate) {
+        setMessage({ type: 'error', text: 'Media file, start date, and end date are required.' });
+        return;
+    }
+     if (newStartDate && newEndDate && new Date(newEndDate) <= new Date(newStartDate)) {
+        setMessage({ type: 'error', text: t('pollEndDateAfterStart') });
         return;
     }
     setIsUploading(true);
@@ -99,11 +109,13 @@ const AdvertisingManager: React.FC<AdvertisingManagerProps> = ({ onBack }) => {
             media_url: mediaUrl,
             media_type: mediaType,
             is_active: true,
+            start_date: newStartDate,
+            end_date: newEndDate,
         });
         if (insertError) throw insertError;
         
         setMessage({ type: 'success', text: t('adCreatedSuccess') });
-        setNewTitle(''); setNewText(''); setNewLink(''); setNewMediaFile(null); setMediaPreview(null);
+        setNewTitle(''); setNewText(''); setNewLink(''); setNewMediaFile(null); setMediaPreview(null); setNewStartDate(''); setNewEndDate('');
         fetchAds();
     } catch (err: any) {
         setMessage({ type: 'error', text: `${t('adCreatedError')}: ${err.message}` });
@@ -120,7 +132,7 @@ const AdvertisingManager: React.FC<AdvertisingManagerProps> = ({ onBack }) => {
             setMessage({ type: 'error', text: `${t('adDeletedError')}: ${deleteError.message}` });
         } else {
             const filePathParts = ad.media_url.split('/');
-            const fileName = filePathParts[filePathParts.length - 1];
+            const fileName = filePathParts.pop()?.split('?')[0];
             if (fileName) {
                  await supabase.storage.from('advertisements-media').remove([`public/${fileName}`]);
             }
@@ -130,20 +142,26 @@ const AdvertisingManager: React.FC<AdvertisingManagerProps> = ({ onBack }) => {
     }
   };
   
-  const handleToggleActive = async (ad: Advertisement) => {
-    const { error } = await supabase
-        .from('advertisements')
-        .update({ is_active: !ad.is_active })
-        .eq('id', ad.id);
+  const getAdStatus = (ad: Advertisement) => {
+    const now = new Date();
+    const start = ad.start_date ? new Date(ad.start_date) : null;
+    const end = ad.end_date ? new Date(ad.end_date) : null;
 
-    if (error) {
-        setMessage({ type: 'error', text: `${t('adUpdatedError')}: ${error.message}` });
-    } else {
-        setMessage({ type: 'success', text: t('adUpdatedSuccess')});
-        fetchAds();
+    if (!ad.is_active) {
+        return { text: t('adStatusInactive'), color: 'bg-gray-500' };
     }
+    if (end && end < now) {
+        return { text: t('adStatusExpired'), color: 'bg-red-600' };
+    }
+    if (start && start > now) {
+        return { text: t('adStatusScheduled'), color: 'bg-blue-600' };
+    }
+    if ((!start || start <= now) && (!end || end >= now)) {
+        return { text: t('adStatusActive'), color: 'bg-green-600' };
+    }
+    return { text: t('adStatusInactive'), color: 'bg-gray-500' };
   };
-  
+
   if (tableExists === false) {
     return <DatabaseSetupInstructions onBack={onBack} />;
   }
@@ -168,6 +186,17 @@ const AdvertisingManager: React.FC<AdvertisingManagerProps> = ({ onBack }) => {
             <input type="text" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} required placeholder={t('adTitleLabel')} className="w-full bg-marine-blue-darkest/80 rounded-md p-2" />
             <textarea value={newText} onChange={(e) => setNewText(e.target.value)} rows={2} placeholder={t('adTextLabel')} className="w-full bg-marine-blue-darkest/80 rounded-md p-2"></textarea>
             <input type="url" value={newLink} onChange={(e) => setNewLink(e.target.value)} required placeholder={t('adLinkLabel')} className="w-full bg-marine-blue-darkest/80 rounded-md p-2" />
+            
+            <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                    <label className="block text-sm font-medium text-white/80 mb-1">{t('pollStartDate')}</label>
+                    <input type="datetime-local" value={newStartDate} onChange={e => setNewStartDate(e.target.value)} required className="w-full bg-marine-blue-darkest/80 rounded-md p-2"/>
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-white/80 mb-1">{t('pollEndDate')}</label>
+                    <input type="datetime-local" value={newEndDate} onChange={e => setNewEndDate(e.target.value)} required className="w-full bg-marine-blue-darkest/80 rounded-md p-2"/>
+                </div>
+            </div>
             
             <div>
                 <label className="block text-sm font-medium text-white/80 mb-1">{t('adMediaLabel')}</label>
@@ -196,36 +225,47 @@ const AdvertisingManager: React.FC<AdvertisingManagerProps> = ({ onBack }) => {
           <h2 className="text-xl font-montserrat mb-4 text-golden-yellow">{t('allAds')}</h2>
           {loading ? <p>{t('newsLoading')}</p> : ads.length === 0 ? <p>{t('noAds')}</p> : (
             <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
-              {ads.map(ad => (
-                <div key={ad.id} className="bg-marine-blue-darkest/50 p-4 rounded-lg flex flex-col md:flex-row gap-4 items-start">
-                  {ad.media_type === 'image' ? 
-                    <img src={ad.media_url} className="w-full md:w-32 h-auto md:h-20 object-cover rounded-md" /> :
-                    <video src={ad.media_url} className="w-full md:w-32 h-auto md:h-20 object-cover rounded-md" />
-                  }
-                  <div className="flex-1">
-                    <p className="font-bold text-white">{ad.title}</p>
-                    <p className="text-sm text-white/80 line-clamp-2">{ad.text}</p>
-                    <a href={ad.link_url} target="_blank" rel="noopener noreferrer" className="text-xs text-golden-yellow hover:underline truncate flex items-center">{ad.link_url} <ChevronRightIcon className="w-4 h-4" /></a>
-                  </div>
-                  <div className="w-full md:w-auto flex flex-row md:flex-col items-center justify-end gap-2">
-                    <button onClick={() => handleToggleActive(ad)} className={`font-bold py-1 px-3 rounded-full text-sm w-24 text-center ${ad.is_active ? 'bg-green-600 hover:bg-green-700' : 'bg-yellow-600 hover:bg-yellow-700'}`}>
-                      {ad.is_active ? t('adStatusActive') : t('adStatusInactive')}
-                    </button>
-                    <button onClick={() => handleDeleteAd(ad)} className="bg-red-600 hover:bg-red-700 font-bold py-1 px-3 rounded-full text-sm w-24 text-center">
-                      {t('adminDeleteButton')}
-                    </button>
-                  </div>
-                </div>
-              ))}
+              {ads.map(ad => {
+                const status = getAdStatus(ad);
+                return (
+                    <div key={ad.id} className="bg-marine-blue-darkest/50 p-4 rounded-lg flex flex-col md:flex-row gap-4 items-start">
+                    {ad.media_type === 'image' ? 
+                        <img src={ad.media_url} className="w-full md:w-32 h-auto md:h-20 object-cover rounded-md" alt={ad.title} /> :
+                        <video src={ad.media_url} className="w-full md:w-32 h-auto md:h-20 object-cover rounded-md" />
+                    }
+                    <div className="flex-1">
+                        <p className="font-bold text-white">{ad.title}</p>
+                        <p className="text-sm text-white/80 line-clamp-2">{ad.text}</p>
+                        <a href={ad.link_url} target="_blank" rel="noopener noreferrer" className="text-xs text-golden-yellow hover:underline truncate flex items-center">{ad.link_url} <ChevronRightIcon className="w-4 h-4" /></a>
+                        <div className="text-xs text-white/70 mt-2">
+                            <p>Start: {ad.start_date ? new Date(ad.start_date).toLocaleString() : 'N/A'}</p>
+                            <p>End: {ad.end_date ? new Date(ad.end_date).toLocaleString() : 'N/A'}</p>
+                        </div>
+                    </div>
+                    <div className="w-full md:w-auto flex flex-row md:flex-col items-center justify-end gap-2">
+                        <span className={`font-bold py-1 px-3 rounded-full text-white text-sm w-24 text-center ${status.color}`}>
+                            {status.text}
+                        </span>
+                        <button onClick={() => setEditingAd(ad)} className="bg-blue-600 hover:bg-blue-700 font-bold py-1 px-3 rounded-full text-sm w-24 text-center flex items-center justify-center gap-1">
+                          <EditIcon className="w-4 h-4" /> {t('editAd')}
+                        </button>
+                        <button onClick={() => handleDeleteAd(ad)} className="bg-red-600 hover:bg-red-700 font-bold py-1 px-3 rounded-full text-sm w-24 text-center">
+                        {t('adminDeleteButton')}
+                        </button>
+                    </div>
+                    </div>
+                );
+              })}
             </div>
           )}
         </div>
+        {editingAd && <EditAdModal ad={editingAd} onClose={() => setEditingAd(null)} onSuccess={fetchAds} />}
     </div>
   );
 };
 
 const DatabaseSetupInstructions: React.FC<{onBack: () => void}> = ({ onBack }) => {
-    const sqlScript = `-- 1. Create the table for storing advertisement data
+    const createTableScript = `-- 1. Create the table for storing advertisement data
 CREATE TABLE public.advertisements (
   id bigint NOT NULL GENERATED BY DEFAULT AS IDENTITY,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
@@ -235,6 +275,8 @@ CREATE TABLE public.advertisements (
   media_type text NOT NULL, -- Should be 'image' or 'video'
   link_url text NOT NULL,
   is_active boolean NOT NULL DEFAULT true,
+  start_date timestamp with time zone NULL,
+  end_date timestamp with time zone NULL,
   CONSTRAINT advertisements_pkey PRIMARY KEY (id)
 );
 
@@ -256,6 +298,13 @@ TO authenticated
 USING ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin'::text)
 WITH CHECK ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin'::text);`;
 
+ const alterTableScript = `-- Run this script if you already created the 'advertisements' table previously.
+
+ALTER TABLE public.advertisements
+ADD COLUMN IF NOT EXISTS start_date timestamp with time zone,
+ADD COLUMN IF NOT EXISTS end_date timestamp with time zone;
+`;
+
     return (
         <div>
              <button onClick={onBack} className="flex items-center gap-2 text-golden-yellow hover:underline mb-4">
@@ -264,10 +313,12 @@ WITH CHECK ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin'::
             </button>
             <div className="bg-marine-blue-darker p-6 rounded-lg shadow-md space-y-4">
                 <h2 className="text-xl font-montserrat text-yellow-400">Database Setup Required</h2>
-                <p>The advertising feature requires a new database table and storage bucket. Please follow these steps:</p>
+                <p>The advertising feature requires an update to your database to support campaign scheduling. Please run the appropriate script below in your Supabase SQL Editor to enable this functionality.</p>
                 
                 <div className="space-y-2">
-                    <h3 className="font-bold text-lg">Step 1: Create Storage Bucket</h3>
+                    <h3 className="font-bold text-lg">For New Setup</h3>
+                    <p>If you have not set up the advertising feature before, please follow these steps:</p>
+                    <h4 className="font-semibold mt-2">Step 1: Create Storage Bucket</h4>
                     <ul className="list-disc list-inside text-white/80 space-y-1">
                         <li>Go to your Supabase project dashboard and navigate to 'Storage'.</li>
                         <li>Click 'New bucket'.</li>
@@ -275,13 +326,18 @@ WITH CHECK ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin'::
                         <li><strong>Important:</strong> Toggle 'Public bucket' to ON.</li>
                         <li>Click 'Create bucket'.</li>
                     </ul>
-                </div>
-
-                <div className="space-y-2">
-                    <h3 className="font-bold text-lg">Step 2: Run SQL Script</h3>
+                    <h4 className="font-semibold mt-2">Step 2: Run SQL Script for New Table</h4>
                     <p>In your Supabase dashboard, navigate to the 'SQL Editor', create a new query, paste the following code, and click 'RUN'.</p>
                     <pre className="bg-marine-blue-darkest p-4 rounded-md text-sm text-white/90 overflow-x-auto">
-                        <code>{sqlScript}</code>
+                        <code>{createTableScript}</code>
+                    </pre>
+                </div>
+
+                <div className="space-y-2 border-t border-white/20 pt-4">
+                    <h3 className="font-bold text-lg text-yellow-300">For Existing Users (Your likely case)</h3>
+                    <p>If you already have an 'advertisements' table but are seeing this page, you need to add the new date columns for scheduling. Please run this script:</p>
+                     <pre className="bg-marine-blue-darkest p-4 rounded-md text-sm text-white/90 overflow-x-auto">
+                        <code>{alterTableScript}</code>
                     </pre>
                 </div>
             </div>
