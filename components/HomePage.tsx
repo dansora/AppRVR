@@ -8,6 +8,7 @@ import RedirectModal from './RedirectModal';
 import { supabase } from '../services/supabaseClient';
 import AnnouncementCard from './AnnouncementCard';
 import AdCarousel from './AdCarousel';
+import ContestCarousel from './ContestCarousel';
 
 interface HomePageProps {
   setActivePage: (page: Page) => void;
@@ -95,6 +96,10 @@ const HomePage: React.FC<HomePageProps> = ({ setActivePage, isLoggedIn, openAuth
 
       <div className="mb-8">
         <AdCarousel />
+      </div>
+
+      <div className="mb-8">
+        <ContestCarousel setActivePage={setActivePage} openAuthModal={openAuthModal} />
       </div>
 
       <div className="space-y-4">
