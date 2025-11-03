@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../services/supabaseClient';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { BackIcon, UploadIcon, ChevronRightIcon } from '../Icons';
+import { BackIcon, UploadIcon, ChevronRightIcon, EditIcon } from '../Icons';
 import ContestDetailsModal from './ContestDetailsModal';
+import EditContestModal from './EditContestModal';
 
 interface Contest {
   id: number;
@@ -14,6 +15,7 @@ interface Contest {
   description: string | null;
   prizes: string | null;
   image_url: string | null;
+  is_active: boolean;
 }
 
 interface ContestsManagerProps {
@@ -26,6 +28,7 @@ const ContestsManager: React.FC<ContestsManagerProps> = ({ onBack }) => {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const [selectedContest, setSelectedContest] = useState<Contest | null>(null);
+  const [editingContest, setEditingContest] = useState<Contest | null>(null);
 
   // Form state
   const [newTitle, setNewTitle] = useState('');
@@ -123,6 +126,9 @@ const ContestsManager: React.FC<ContestsManagerProps> = ({ onBack }) => {
     const start = new Date(contest.start_date);
     const end = new Date(contest.end_date);
 
+    if (!contest.is_active) {
+        return { text: t('contestStatusInactive'), color: 'bg-gray-500' };
+    }
     if (contest.winner_id) {
         return { text: t('contestStatusWinnerSelected'), color: 'bg-purple-600' };
     }
@@ -221,6 +227,9 @@ const ContestsManager: React.FC<ContestsManagerProps> = ({ onBack }) => {
                             <span className={`font-bold py-1 px-3 rounded-full text-white text-xs w-32 text-center ${status.color}`}>
                                 {status.text}
                             </span>
+                            <button onClick={() => setEditingContest(contest)} className="bg-blue-600 hover:bg-blue-700 font-bold py-2 px-4 rounded-full text-sm text-center flex items-center justify-center gap-1">
+                                <EditIcon className="w-4 h-4" />
+                            </button>
                             <button onClick={() => setSelectedContest(contest)} className="bg-blue-600 hover:bg-blue-700 font-bold py-2 px-4 rounded-full text-sm text-center flex items-center justify-center gap-1">
                                 {t('manageContest')} <ChevronRightIcon className="w-4 h-4" />
                             </button>
@@ -232,6 +241,7 @@ const ContestsManager: React.FC<ContestsManagerProps> = ({ onBack }) => {
           )}
         </div>
         {selectedContest && <ContestDetailsModal contest={selectedContest} onClose={() => setSelectedContest(null)} onUpdate={fetchContests} />}
+        {editingContest && <EditContestModal contest={editingContest} onClose={() => setEditingContest(null)} onSuccess={fetchContests} />}
     </div>
   );
 };
