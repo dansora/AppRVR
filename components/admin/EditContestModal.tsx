@@ -13,6 +13,7 @@ interface Contest {
   start_date: string;
   end_date: string;
   is_active: boolean;
+  number_of_prizes: number;
 }
 
 interface EditContestModalProps {
@@ -29,6 +30,7 @@ const EditContestModal: React.FC<EditContestModalProps> = ({ contest, onClose, o
   const [title, setTitle] = useState(contest.title);
   const [description, setDescription] = useState(contest.description || '');
   const [prizes, setPrizes] = useState(contest.prizes || '');
+  const [numberOfPrizes, setNumberOfPrizes] = useState(contest.number_of_prizes || 1);
   const [isActive, setIsActive] = useState(contest.is_active);
 
   const formatDateForInput = (dateString: string | null) => {
@@ -89,6 +91,7 @@ const EditContestModal: React.FC<EditContestModalProps> = ({ contest, onClose, o
             title,
             description: description || null,
             prizes: prizes || null,
+            number_of_prizes: numberOfPrizes,
             start_date: startDate || null,
             end_date: endDate || null,
             is_active: isActive,
@@ -122,6 +125,11 @@ const EditContestModal: React.FC<EditContestModalProps> = ({ contest, onClose, o
                     <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} required placeholder={t('contestNameLabel')} className="w-full bg-marine-blue-darker/80 rounded-md p-2" />
                     <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder={t('contestDescLabel')} className="w-full bg-marine-blue-darker/80 rounded-md p-2"></textarea>
                     <textarea value={prizes} onChange={(e) => setPrizes(e.target.value)} rows={2} placeholder={t('contestPrizesLabel')} className="w-full bg-marine-blue-darker/80 rounded-md p-2"></textarea>
+                    
+                    <div>
+                        <label className="block text-sm font-medium text-white/80 mb-1">{t('contestNumberOfPrizesLabel')}</label>
+                        <input type="number" min="1" value={numberOfPrizes} onChange={(e) => setNumberOfPrizes(parseInt(e.target.value, 10) || 1)} required className="w-full bg-marine-blue-darker/80 rounded-md p-2"/>
+                    </div>
 
                     <div className="grid md:grid-cols-2 gap-4">
                         <div>

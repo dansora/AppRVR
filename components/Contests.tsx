@@ -11,12 +11,11 @@ interface Contest {
   prizes: string;
   image_url: string;
   end_date: string;
-  winner_id: string | null;
 }
 
 const Contests: React.FC = () => {
   const { t } = useLanguage();
-  const { session, profile } = useProfile();
+  const { session } = useProfile();
   const [activeContests, setActiveContests] = useState<Contest[]>([]);
   const [pastContests, setPastContests] = useState<Contest[]>([]);
   const [participations, setParticipations] = useState<Set<number>>(new Set());
@@ -25,19 +24,19 @@ const Contests: React.FC = () => {
 
   const fetchContests = useCallback(async () => {
     setLoading(true);
-    const now = new Date().toISOString();
+    const now = new Date();
 
     const { data, error } = await supabase
       .from('contests')
-      .select('id, title, description, prizes, image_url, end_date, winner_id')
+      .select('id, title, description, prizes, image_url, end_date')
       .eq('is_active', true)
       .order('end_date', { ascending: false });
 
     if (error) {
       console.error("Error fetching contests:", error);
     } else if (data) {
-      const active = data.filter(c => new Date(c.end_date) > new Date());
-      const past = data.filter(c => new Date(c.end_date) <= new Date() && c.winner_id);
+      const active = data.filter(c => new Date(c.end_date) > now);
+      const past = data.filter(c => new Date(c.end_date) <= now);
       setActiveContests(active);
       setPastContests(past.slice(0, 3)); // Show latest 3 past contests
     }
@@ -103,9 +102,8 @@ const Contests: React.FC = () => {
       )}
 
       {isPast && (
-        <div className="bg-green-500/10 p-2 rounded-md text-center">
-            <p className="text-sm text-green-300">{t('contestEnded')}</p>
-            {/* Future: Display winner info here */}
+        <div className="bg-red-500/10 p-2 rounded-md text-center">
+            <p className="text-sm text-red-300">{t('contestEnded')}</p>
         </div>
       )}
 

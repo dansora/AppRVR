@@ -25,7 +25,7 @@ const ContestCarousel: React.FC<ContestCarouselProps> = ({ setActivePage, openAu
   const { t } = useLanguage();
   const { session } = useProfile();
   const [activeContests, setActiveContests] = useState<Contest[]>([]);
-  const [latestWinner, setLatestWinner] = useState<Winner | null>(null);
+  const [latestWinners, setLatestWinners] = useState<Winner[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
 
@@ -49,27 +49,27 @@ const ContestCarousel: React.FC<ContestCarouselProps> = ({ setActivePage, openAu
         setActiveContests(activeData || []);
       }
 
-      // Fetch the most recent winner
+      // Fetch the most recent contest that has ended
       const { data: pastContest, error: pastError } = await supabase
         .from('contests')
-        .select('winner_id')
+        .select('id')
         .lt('end_date', now)
-        .not('winner_id', 'is', null)
         .order('end_date', { ascending: false })
         .limit(1)
         .single();
       
-      if (pastContest && pastContest.winner_id) {
-          const { data: winnerProfile, error: profileError } = await supabase
-            .from('profiles')
-            .select('username')
-            .eq('id', pastContest.winner_id)
-            .single();
-        
-          if (winnerProfile) {
-              setLatestWinner({ username: winnerProfile.username || 'N/A' });
-          } else if (profileError) {
-              console.error("Error fetching winner profile:", profileError.message);
+      if (pastContest) {
+          const { data: winnersData, error: winnersError } = await supabase
+            .from('contest_participants')
+            .select('profiles(username)')
+            .eq('contest_id', pastContest.id)
+            .eq('is_winner', true);
+
+          if (winnersData && winnersData.length > 0) {
+              const winners = winnersData.map(w => ({ username: w.profiles?.username || 'N/A' }));
+              setLatestWinners(winners);
+          } else if (winnersError) {
+               console.error("Error fetching winners:", winnersError.message);
           }
       } else if (pastError && pastError.code !== 'PGRST116') { // Ignore "No rows found"
           console.error("Error fetching past contest:", pastError.message);
@@ -81,7 +81,7 @@ const ContestCarousel: React.FC<ContestCarouselProps> = ({ setActivePage, openAu
     fetchContestData();
   }, []);
 
-  const slides = [...activeContests, ...(latestWinner ? [latestWinner] : [])];
+  const slides = [...activeContests, ...(latestWinners.length > 0 ? [latestWinners] : [])];
 
   useEffect(() => {
     if (slides.length > 1) {
@@ -109,6 +109,10 @@ const ContestCarousel: React.FC<ContestCarouselProps> = ({ setActivePage, openAu
     return null;
   }
 
+  const isWinnerSlide = (slide: Contest | Winner[]): slide is Winner[] => {
+    return Array.isArray(slide);
+  };
+
   return (
     <div>
       <h3 className="text-xl font-montserrat text-white mb-4">{t('contestsCarouselTitle')}</h3>
@@ -119,7 +123,7 @@ const ContestCarousel: React.FC<ContestCarouselProps> = ({ setActivePage, openAu
         >
           {slides.map((slide, index) => (
             <div key={index} className="w-full flex-shrink-0">
-                { 'title' in slide ? ( // It's a Contest
+                { !isWinnerSlide(slide) ? ( // It's a Contest
                     <div className="bg-marine-blue-darker p-4 rounded-lg shadow-lg border-l-4 border-golden-yellow">
                         <div className="flex items-start gap-4">
                             {slide.image_url && 
@@ -141,12 +145,12 @@ const ContestCarousel: React.FC<ContestCarouselProps> = ({ setActivePage, openAu
                             </div>
                         </div>
                     </div>
-                ) : ( // It's a Winner
+                ) : ( // It's a Winner array
                     <div className="bg-marine-blue-darker p-4 rounded-lg shadow-lg border-l-4 border-golden-yellow">
                         <div className="flex flex-col items-center justify-center text-center h-[172px]">
                            <TrophyIcon className="w-16 h-16 text-golden-yellow mb-2"/>
                            <h3 className="text-lg font-bold font-montserrat text-white mb-2">{t('winnerCardTitle')}</h3>
-                           <p className="text-white/90 text-md">{t('lastContestWinner', { username: slide.username })}</p>
+                           <p className="text-white/90 text-md">{t('lastContestWinners', { usernames: slide.map(w => w.username).join(', ') })}</p>
                         </div>
                     </div>
                 )}

@@ -11,11 +11,12 @@ interface Contest {
   title: string;
   start_date: string;
   end_date: string;
-  winner_id: string | null;
   description: string | null;
   prizes: string | null;
   image_url: string | null;
   is_active: boolean;
+  number_of_prizes: number;
+  contest_participants: { is_winner: boolean }[];
 }
 
 interface ContestsManagerProps {
@@ -34,6 +35,7 @@ const ContestsManager: React.FC<ContestsManagerProps> = ({ onBack }) => {
   const [newTitle, setNewTitle] = useState('');
   const [newDescription, setNewDescription] = useState('');
   const [newPrizes, setNewPrizes] = useState('');
+  const [newNumberOfPrizes, setNewNumberOfPrizes] = useState(1);
   const [newImageFile, setNewImageFile] = useState<File | null>(null);
   const [newStartDate, setNewStartDate] = useState('');
   const [newEndDate, setNewEndDate] = useState('');
@@ -45,7 +47,7 @@ const ContestsManager: React.FC<ContestsManagerProps> = ({ onBack }) => {
     setLoading(true);
     const { data, error } = await supabase
       .from('contests')
-      .select('*')
+      .select('*, contest_participants(is_winner)')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -56,7 +58,7 @@ const ContestsManager: React.FC<ContestsManagerProps> = ({ onBack }) => {
       }
     } else {
       setTableExists(true);
-      setContests(data || []);
+      setContests(data as Contest[] || []);
     }
     setLoading(false);
   }, [t]);
@@ -105,6 +107,7 @@ const ContestsManager: React.FC<ContestsManagerProps> = ({ onBack }) => {
             title: newTitle,
             description: newDescription || null,
             prizes: newPrizes || null,
+            number_of_prizes: newNumberOfPrizes,
             image_url: imageUrl,
             start_date: newStartDate,
             end_date: newEndDate,
@@ -112,7 +115,7 @@ const ContestsManager: React.FC<ContestsManagerProps> = ({ onBack }) => {
         if (insertError) throw insertError;
         
         setMessage({ type: 'success', text: t('contestCreatedSuccess') });
-        setNewTitle(''); setNewDescription(''); setNewPrizes(''); setNewImageFile(null); setImagePreview(null); setNewStartDate(''); setNewEndDate('');
+        setNewTitle(''); setNewDescription(''); setNewPrizes(''); setNewNumberOfPrizes(1); setNewImageFile(null); setImagePreview(null); setNewStartDate(''); setNewEndDate('');
         fetchContests();
     } catch (err: any) {
         setMessage({ type: 'error', text: `${t('contestCreatedError')}: ${err.message}` });
@@ -125,11 +128,12 @@ const ContestsManager: React.FC<ContestsManagerProps> = ({ onBack }) => {
     const now = new Date();
     const start = new Date(contest.start_date);
     const end = new Date(contest.end_date);
+    const winnerCount = contest.contest_participants?.filter(p => p.is_winner).length || 0;
 
     if (!contest.is_active) {
         return { text: t('contestStatusInactive'), color: 'bg-gray-500' };
     }
-    if (contest.winner_id) {
+    if (winnerCount > 0) {
         return { text: t('contestStatusWinnerSelected'), color: 'bg-purple-600' };
     }
     if (end < now) {
@@ -177,6 +181,11 @@ const ContestsManager: React.FC<ContestsManagerProps> = ({ onBack }) => {
             <textarea value={newDescription} onChange={(e) => setNewDescription(e.target.value)} rows={3} placeholder={t('contestDescLabel')} className="w-full bg-marine-blue-darkest/80 rounded-md p-2"></textarea>
             <textarea value={newPrizes} onChange={(e) => setNewPrizes(e.target.value)} rows={2} placeholder={t('contestPrizesLabel')} className="w-full bg-marine-blue-darkest/80 rounded-md p-2"></textarea>
             
+            <div>
+                <label className="block text-sm font-medium text-white/80 mb-1">{t('contestNumberOfPrizesLabel')}</label>
+                <input type="number" min="1" value={newNumberOfPrizes} onChange={(e) => setNewNumberOfPrizes(parseInt(e.target.value, 10) || 1)} required className="w-full bg-marine-blue-darkest/80 rounded-md p-2"/>
+            </div>
+
             <div className="grid md:grid-cols-2 gap-4">
                 <div>
                     <label className="block text-sm font-medium text-white/80 mb-1">{t('pollStartDate')}</label>
@@ -227,10 +236,10 @@ const ContestsManager: React.FC<ContestsManagerProps> = ({ onBack }) => {
                             <span className={`font-bold py-1 px-3 rounded-full text-white text-xs w-32 text-center ${status.color}`}>
                                 {status.text}
                             </span>
-                            <button onClick={() => setEditingContest(contest)} className="bg-blue-600 hover:bg-blue-700 font-bold py-2 px-4 rounded-full text-sm text-center flex items-center justify-center gap-1">
+                            <button onClick={() => setEditingContest(contest as any)} className="bg-blue-600 hover:bg-blue-700 font-bold py-2 px-4 rounded-full text-sm text-center flex items-center justify-center gap-1">
                                 <EditIcon className="w-4 h-4" />
                             </button>
-                            <button onClick={() => setSelectedContest(contest)} className="bg-blue-600 hover:bg-blue-700 font-bold py-2 px-4 rounded-full text-sm text-center flex items-center justify-center gap-1">
+                            <button onClick={() => setSelectedContest(contest as any)} className="bg-blue-600 hover:bg-blue-700 font-bold py-2 px-4 rounded-full text-sm text-center flex items-center justify-center gap-1">
                                 {t('manageContest')} <ChevronRightIcon className="w-4 h-4" />
                             </button>
                         </div>
@@ -240,8 +249,8 @@ const ContestsManager: React.FC<ContestsManagerProps> = ({ onBack }) => {
             </div>
           )}
         </div>
-        {selectedContest && <ContestDetailsModal contest={selectedContest} onClose={() => setSelectedContest(null)} onUpdate={fetchContests} />}
-        {editingContest && <EditContestModal contest={editingContest} onClose={() => setEditingContest(null)} onSuccess={fetchContests} />}
+        {selectedContest && <ContestDetailsModal contest={selectedContest as any} onClose={() => setSelectedContest(null)} onUpdate={fetchContests} />}
+        {editingContest && <EditContestModal contest={editingContest as any} onClose={() => setEditingContest(null)} onSuccess={fetchContests} />}
     </div>
   );
 };

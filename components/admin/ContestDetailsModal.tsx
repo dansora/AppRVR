@@ -2,18 +2,17 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../services/supabaseClient';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { CloseIcon, TrophyIcon, MailIcon, UserIcon } from '../Icons';
-import { Profile } from '../../contexts/ProfileContext';
 
 interface Contest {
   id: number;
   title: string;
   end_date: string;
-  winner_id: string | null;
+  number_of_prizes: number;
 }
 
-// Am simplificat tipul pentru a elimina proprietatea email, care cauza eroarea.
 interface Participant {
   user_id: string;
+  is_winner: boolean;
   profiles: {
     username: string;
   } | null;
@@ -28,8 +27,6 @@ interface ContestDetailsModalProps {
 const ContestDetailsModal: React.FC<ContestDetailsModalProps> = ({ contest, onClose, onUpdate }) => {
   const { t } = useLanguage();
   const [participants, setParticipants] = useState<Participant[]>([]);
-  // Tipul pentru câștigător a fost schimbat la 'Profile', deoarece nu mai preluăm email-ul.
-  const [winner, setWinner] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
@@ -37,49 +34,42 @@ const ContestDetailsModal: React.FC<ContestDetailsModalProps> = ({ contest, onCl
     setLoading(true);
     setMessage(null);
     
-    // S-a simplificat interogarea pentru a prelua doar username-ul, evitând join-ul care cauza eroarea.
     const { data: participantsData, error: participantsError } = await supabase
       .from('contest_participants')
-      .select('user_id, profiles!inner(username)')
+      .select('user_id, is_winner, profiles!inner(username)')
       .eq('contest_id', contest.id);
 
     if (participantsError) {
       setMessage({ type: 'error', text: participantsError.message });
     } else {
-      setParticipants(participantsData || []);
-    }
-
-    // Preluăm detaliile câștigătorului fără a încerca să facem join cu tabela de utilizatori (users).
-    if (contest.winner_id) {
-      const { data: winnerData, error: winnerError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', contest.winner_id)
-        .single();
-      if (winnerError) {
-        console.error("Error fetching winner", winnerError);
-      } else {
-        setWinner(winnerData as Profile);
-      }
+      setParticipants(participantsData as Participant[] || []);
     }
 
     setLoading(false);
-  }, [contest.id, contest.winner_id]);
+  }, [contest.id]);
 
   useEffect(() => {
     fetchDetails();
   }, [fetchDetails]);
 
-  const handleSelectWinner = async () => {
-    if (participants.length === 0) return;
+  const handleSelectWinners = async () => {
+    setMessage(null);
+    const winners = participants.filter(p => p.is_winner);
+    const nonWinners = participants.filter(p => !p.is_winner);
+    const prizesToAward = contest.number_of_prizes - winners.length;
+
+    if (nonWinners.length === 0 || prizesToAward <= 0) return;
     if (window.confirm(t('confirmWinnerSelection'))) {
-      const winnerParticipant = participants[Math.floor(Math.random() * participants.length)];
-      const winnerId = winnerParticipant.user_id;
+      
+      const shuffled = nonWinners.sort(() => 0.5 - Math.random());
+      const newWinners = shuffled.slice(0, prizesToAward);
+      const newWinnerIds = newWinners.map(w => w.user_id);
 
       const { error } = await supabase
-        .from('contests')
-        .update({ winner_id: winnerId })
-        .eq('id', contest.id);
+        .from('contest_participants')
+        .update({ is_winner: true })
+        .in('user_id', newWinnerIds)
+        .eq('contest_id', contest.id);
 
       if (error) {
         setMessage({ type: 'error', text: t('winnerSelectedError') });
@@ -92,6 +82,8 @@ const ContestDetailsModal: React.FC<ContestDetailsModalProps> = ({ contest, onCl
   };
 
   const isContestEnded = new Date(contest.end_date) < new Date();
+  const winners = participants.filter(p => p.is_winner);
+  const allPrizesAwarded = winners.length >= contest.number_of_prizes;
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
@@ -108,24 +100,38 @@ const ContestDetailsModal: React.FC<ContestDetailsModalProps> = ({ contest, onCl
                 {loading ? <p>{t('newsLoading')}</p> : (
                     <>
                         {/* Winner Section */}
-                        {winner ? (
-                            <div className="bg-green-500/10 p-4 rounded-lg mb-4">
-                                <h4 className="font-bold text-lg text-green-300 flex items-center gap-2"><TrophyIcon className="w-5 h-5"/> {t('winner')}</h4>
-                                <p>{winner.username}</p>
-                                <button disabled={true} className="mt-2 inline-flex items-center gap-2 bg-golden-yellow text-marine-blue font-bold text-sm py-1 px-3 rounded-full opacity-50 cursor-not-allowed">
-                                    <MailIcon className="w-4 h-4"/> {t('emailWinner')}
+                        <div className="bg-marine-blue-darker/50 p-4 rounded-lg mb-4">
+                            <h4 className="font-bold text-lg text-golden-yellow flex items-center gap-2">
+                                <TrophyIcon className="w-5 h-5"/> {t('winners')}
+                            </h4>
+                            <p className="text-white/80 mb-4">{t('contestWinnersCount', { count: String(winners.length), total: String(contest.number_of_prizes) })}</p>
+
+                            {winners.length > 0 && (
+                                <div className="space-y-1">
+                                    {winners.map(w => (
+                                        <div key={w.user_id} className="flex items-center gap-2 text-green-300">
+                                            <TrophyIcon className="w-4 h-4" />
+                                            <p className="font-semibold">{w.profiles?.username || 'N/A'}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {isContestEnded && !allPrizesAwarded && (
+                                <button
+                                    onClick={handleSelectWinners}
+                                    disabled={participants.filter(p => !p.is_winner).length === 0}
+                                    className="w-full mt-4 bg-golden-yellow text-marine-blue font-bold py-2 rounded-full disabled:opacity-50"
+                                >
+                                    {t('selectRemainingWinners')}
                                 </button>
-                                <p className="text-xs text-white/60 mt-1">Email-ul nu este disponibil din cauza erorii de schemă.</p>
-                            </div>
-                        ) : isContestEnded ? (
-                            <button
-                                onClick={handleSelectWinner}
-                                disabled={participants.length === 0}
-                                className="w-full bg-golden-yellow text-marine-blue font-bold py-2 rounded-full mb-4 disabled:opacity-50"
-                            >
-                                {t('selectWinner')}
-                            </button>
-                        ) : <p className="text-sm text-center text-white/70 mb-4">Câștigătorul poate fi ales după încheierea concursului.</p>}
+                            )}
+
+                            {isContestEnded && allPrizesAwarded && (
+                                <p className="text-sm text-center font-semibold text-green-400 mt-4">{t('allPrizesAwarded')}</p>
+                            )}
+                             {!isContestEnded && <p className="text-sm text-center text-white/70 mt-4">Câștigătorii pot fi aleși după încheierea concursului.</p>}
+                        </div>
                         
                         {/* Participants List */}
                         <div>
@@ -133,11 +139,9 @@ const ContestDetailsModal: React.FC<ContestDetailsModalProps> = ({ contest, onCl
                             {participants.length > 0 ? (
                                 <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
                                     {participants.map(p => (
-                                        <div key={p.user_id} className="bg-marine-blue-darker/50 p-2 rounded-md flex items-center gap-2">
-                                            <UserIcon className="w-5 h-5 text-white/70" />
-                                            <div>
-                                                <p className="text-sm font-semibold">{p.profiles?.username || 'N/A'}</p>
-                                            </div>
+                                        <div key={p.user_id} className={`p-2 rounded-md flex items-center gap-2 ${p.is_winner ? 'bg-green-500/20' : 'bg-marine-blue-darker/50'}`}>
+                                            {p.is_winner ? <TrophyIcon className="w-5 h-5 text-golden-yellow" /> : <UserIcon className="w-5 h-5 text-white/70" />}
+                                            <p className="text-sm font-semibold">{p.profiles?.username || 'N/A'}</p>
                                         </div>
                                     ))}
                                 </div>
