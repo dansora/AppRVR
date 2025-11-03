@@ -11,24 +11,12 @@ interface Contest {
   winner_id: string | null;
 }
 
-// Fix: The profiles table does not contain an email. This must be joined from the auth.users table.
-// The Supabase query will return a nested 'users' object.
+// Am simplificat tipul pentru a elimina proprietatea email, care cauza eroarea.
 interface Participant {
   user_id: string;
   profiles: {
     username: string;
-    // Fix: Changed structure to match query result
-    users: {
-        email: string;
-    } | null;
   } | null;
-}
-
-// Fix: The Profile type doesn't include an email. We'll create a local extended type for the winner.
-interface WinnerProfile extends Profile {
-    users: {
-        email: string;
-    } | null;
 }
 
 interface ContestDetailsModalProps {
@@ -40,8 +28,8 @@ interface ContestDetailsModalProps {
 const ContestDetailsModal: React.FC<ContestDetailsModalProps> = ({ contest, onClose, onUpdate }) => {
   const { t } = useLanguage();
   const [participants, setParticipants] = useState<Participant[]>([]);
-  // Fix: Use the extended WinnerProfile type for the state.
-  const [winner, setWinner] = useState<WinnerProfile | null>(null);
+  // Tipul pentru câștigător a fost schimbat la 'Profile', deoarece nu mai preluăm email-ul.
+  const [winner, setWinner] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
@@ -49,11 +37,10 @@ const ContestDetailsModal: React.FC<ContestDetailsModalProps> = ({ contest, onCl
     setLoading(true);
     setMessage(null);
     
-    // Fetch participants
+    // S-a simplificat interogarea pentru a prelua doar username-ul, evitând join-ul care cauza eroarea.
     const { data: participantsData, error: participantsError } = await supabase
       .from('contest_participants')
-      // Fix: Corrected Supabase query to join users table for email.
-      .select('user_id, profiles!inner(username, users!inner(email))')
+      .select('user_id, profiles!inner(username)')
       .eq('contest_id', contest.id);
 
     if (participantsError) {
@@ -62,19 +49,17 @@ const ContestDetailsModal: React.FC<ContestDetailsModalProps> = ({ contest, onCl
       setParticipants(participantsData || []);
     }
 
-    // Fetch winner if exists
+    // Preluăm detaliile câștigătorului fără a încerca să facem join cu tabela de utilizatori (users).
     if (contest.winner_id) {
       const { data: winnerData, error: winnerError } = await supabase
         .from('profiles')
-        // Fix: Corrected Supabase query to join users table for email.
-        .select('*, users(email)')
+        .select('*')
         .eq('id', contest.winner_id)
         .single();
       if (winnerError) {
         console.error("Error fetching winner", winnerError);
       } else {
-        // Fix: Cast the result to our extended WinnerProfile type.
-        setWinner(winnerData as WinnerProfile);
+        setWinner(winnerData as Profile);
       }
     }
 
@@ -126,11 +111,11 @@ const ContestDetailsModal: React.FC<ContestDetailsModalProps> = ({ contest, onCl
                         {winner ? (
                             <div className="bg-green-500/10 p-4 rounded-lg mb-4">
                                 <h4 className="font-bold text-lg text-green-300 flex items-center gap-2"><TrophyIcon className="w-5 h-5"/> {t('winner')}</h4>
-                                {/* Fix: Access email via the nested 'users' object. */}
-                                <p>{winner.username} ({winner.users?.email})</p>
-                                <a href={`mailto:${winner.users?.email}`} className="mt-2 inline-flex items-center gap-2 bg-golden-yellow text-marine-blue font-bold text-sm py-1 px-3 rounded-full">
+                                <p>{winner.username}</p>
+                                <button disabled={true} className="mt-2 inline-flex items-center gap-2 bg-golden-yellow text-marine-blue font-bold text-sm py-1 px-3 rounded-full opacity-50 cursor-not-allowed">
                                     <MailIcon className="w-4 h-4"/> {t('emailWinner')}
-                                </a>
+                                </button>
+                                <p className="text-xs text-white/60 mt-1">Email-ul nu este disponibil din cauza erorii de schemă.</p>
                             </div>
                         ) : isContestEnded ? (
                             <button
@@ -140,7 +125,7 @@ const ContestDetailsModal: React.FC<ContestDetailsModalProps> = ({ contest, onCl
                             >
                                 {t('selectWinner')}
                             </button>
-                        ) : <p className="text-sm text-center text-white/70 mb-4">Winner can be selected after the contest ends.</p>}
+                        ) : <p className="text-sm text-center text-white/70 mb-4">Câștigătorul poate fi ales după încheierea concursului.</p>}
                         
                         {/* Participants List */}
                         <div>
@@ -152,8 +137,6 @@ const ContestDetailsModal: React.FC<ContestDetailsModalProps> = ({ contest, onCl
                                             <UserIcon className="w-5 h-5 text-white/70" />
                                             <div>
                                                 <p className="text-sm font-semibold">{p.profiles?.username || 'N/A'}</p>
-                                                {/* Fix: Access email via the nested 'users' object. */}
-                                                <p className="text-xs text-white/60">{p.profiles?.users?.email || 'N/A'}</p>
                                             </div>
                                         </div>
                                     ))}
