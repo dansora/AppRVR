@@ -160,27 +160,22 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ setActivePage, openAuthModal 
     if (window.confirm(t('deleteAccountConfirmation'))) {
         setIsDeleting(true);
         try {
-            // Changed from Edge Function to RPC call for a more direct database operation.
-            // The app administrator must create a 'delete_user_account' function in Supabase.
-            const { error } = await supabase.rpc('delete_user_account');
+            // Reverted to using a Supabase Edge Function.
+            // The app administrator must ensure an Edge Function named 'delete-user' is deployed.
+            const { error } = await supabase.functions.invoke('delete-user');
 
             if (error) {
                 throw error;
             }
-            // The RPC function on the backend should handle user deletion.
-            // After successful deletion, the session is invalidated.
-            // We sign out on the client to clear local session data.
+
+            // The Edge Function should handle the deletion.
+            // Sign out on the client to clear local session.
             await supabase.auth.signOut();
             window.location.reload();
         } catch (error: any) {
             console.error("Error deleting account:", error);
             const errorMessage = error.message || (typeof error === 'object' && error !== null ? JSON.stringify(error) : String(error));
-            // Provide a more specific error if the RPC function doesn't exist.
-            if (errorMessage.includes('function delete_user_account() does not exist')) {
-                setMessage({ type: 'error', text: `${t('deleteAccountError')} (Database function not found. Please contact support.)` });
-            } else {
-                setMessage({ type: 'error', text: `${t('deleteAccountError')} (${errorMessage})` });
-            }
+            setMessage({ type: 'error', text: `${t('deleteAccountError')} (${errorMessage})` });
         } finally {
             setIsDeleting(false);
         }
