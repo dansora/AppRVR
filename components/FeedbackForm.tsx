@@ -49,15 +49,17 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onReviewTerms, isLoggedIn }
     if (window.confirm(t('deleteAccountConfirmation'))) {
         setIsDeleting(true);
         try {
-            // Call the secure Supabase Edge Function to delete the user.
-            const { error } = await supabase.functions.invoke('delete-user');
+            // Changed from Edge Function to RPC call for a more direct database operation.
+            // The app administrator must create a 'delete_user_account' function in Supabase.
+            const { error } = await supabase.rpc('delete_user_account');
 
             if (error) {
                 throw error;
             }
 
-            // If the function succeeds, the user is deleted on the backend.
-            // Now, sign out the user from the current session on the client-side.
+            // The RPC function on the backend should handle user deletion.
+            // After successful deletion, the session is invalidated.
+            // We sign out on the client to clear local session data.
             await supabase.auth.signOut();
             
             // Reload the app to reflect the signed-out state.
@@ -65,7 +67,13 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onReviewTerms, isLoggedIn }
 
         } catch (error: any) {
             console.error("Error deleting account:", error);
-            setDeleteError(t('deleteAccountError'));
+            const errorMessage = error.message || (typeof error === 'object' && error !== null ? JSON.stringify(error) : String(error));
+             // Provide a more specific error if the RPC function doesn't exist.
+            if (errorMessage.includes('function delete_user_account() does not exist')) {
+                setDeleteError(`${t('deleteAccountError')} (Database function not found. Please contact support.)`);
+            } else {
+                setDeleteError(`${t('deleteAccountError')} (${errorMessage})`);
+            }
         } finally {
             setIsDeleting(false);
         }
