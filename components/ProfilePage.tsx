@@ -160,16 +160,15 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ setActivePage, openAuthModal 
     if (window.confirm(t('deleteAccountConfirmation'))) {
         setIsDeleting(true);
         try {
-            // Reverted to using a Supabase Edge Function.
-            // The app administrator must ensure an Edge Function named 'delete-user' is deployed.
-            const { error } = await supabase.functions.invoke('delete-user');
+            // Using a database function (RPC) to delete the user.
+            // This requires a SQL function `delete_user` to be created in the database.
+            const { error } = await supabase.rpc('delete_user');
 
             if (error) {
                 throw error;
             }
 
-            // The Edge Function should handle the deletion.
-            // Sign out on the client to clear local session.
+            // After successful deletion in the backend, sign out on the client.
             await supabase.auth.signOut();
             window.location.reload();
         } catch (error: any) {
