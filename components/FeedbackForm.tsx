@@ -141,7 +141,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onReviewTerms, isLoggedIn }
                         <span className="text-white font-medium">{t('settingsTerms')}</span>
                         <ChevronRightIcon className="w-6 h-6 text-white/50" />
                     </button>
-                    <a href="https://radiovocearomanilor.com/wp/radio-vocea-romanilor-politica-confidentialitate/?preview_id=5002&preview_nonce=a26aa8effc&preview=true" target="_blank" rel="noopener noreferrer" className="w-full flex justify-between items-center p-3 bg-marine-blue-darkest/50 rounded-md hover:bg-marine-blue-darkest transition-colors">
+                    <a href="https://radiovocearomanilor.com/wp/politica-confidentialitate/" target="_blank" rel="noopener noreferrer" className="w-full flex justify-between items-center p-3 bg-marine-blue-darkest/50 rounded-md hover:bg-marine-blue-darkest transition-colors">
                         <span className="text-white font-medium">{t('settingsPrivacy')}</span>
                         <ChevronRightIcon className="w-6 h-6 text-white/50" />
                     </a>
