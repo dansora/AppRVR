@@ -13,6 +13,15 @@ interface ActiveContestSlide {
   image_url: string | null;
 }
 
+interface UpcomingContestSlide {
+  type: 'upcoming';
+  id: number;
+  title: string;
+  prizes: string | null;
+  image_url: string | null;
+  start_date: string;
+}
+
 interface Winner {
     username: string;
 }
@@ -21,12 +30,9 @@ interface PastContestSlide {
     type: 'past';
     contestTitle: string;
     winners: Winner[];
-    prizes: string | null;
-    image_url: string | null;
 }
 
-type CarouselSlide = ActiveContestSlide | PastContestSlide;
-
+type CarouselSlide = ActiveContestSlide | UpcomingContestSlide | PastContestSlide;
 
 interface ContestCarouselProps {
     setActivePage: (page: Page) => void;
@@ -44,10 +50,10 @@ const ContestCarousel: React.FC<ContestCarouselProps> = ({ setActivePage, openAu
     const fetchContestData = async () => {
       setLoading(true);
       const now = new Date().toISOString();
-      let fetchedSlides: CarouselSlide[] = [];
+      let finalSlides: CarouselSlide[] = [];
 
-      // Fetch active contests
-      const { data: activeData, error: activeError } = await supabase
+      // 1. Fetch active contests
+      const { data: activeData } = await supabase
         .from('contests')
         .select('id, title, prizes, image_url')
         .eq('is_active', true)
@@ -55,14 +61,25 @@ const ContestCarousel: React.FC<ContestCarouselProps> = ({ setActivePage, openAu
         .gte('end_date', now)
         .order('end_date', { ascending: true });
         
-      if (activeError) {
-        console.error("Error fetching active contests:", activeError.message);
-      } else if (activeData) {
-        fetchedSlides = activeData.map(c => ({ ...c, type: 'active' }));
+      if (activeData && activeData.length > 0) {
+        finalSlides.push(...activeData.map(c => ({ ...c, type: 'active' as const })));
+      } else {
+        // 2. If no active contests, fetch the next upcoming one
+        const { data: upcomingData } = await supabase
+          .from('contests')
+          .select('id, title, prizes, image_url, start_date')
+          .eq('is_active', true)
+          .gt('start_date', now)
+          .order('start_date', { ascending: true })
+          .limit(1);
+        
+        if (upcomingData && upcomingData.length > 0) {
+          finalSlides.push(...upcomingData.map(c => ({ ...c, type: 'upcoming' as const })));
+        }
       }
 
-      // Fetch up to 3 most recent contests that have ended
-      const { data: pastContests, error: pastError } = await supabase
+      // 3. Fetch up to 3 most recent contests that have winners
+      const { data: pastContests } = await supabase
         .from('contests')
         .select('id, title, prizes, image_url')
         .lt('end_date', now)
@@ -77,22 +94,21 @@ const ContestCarousel: React.FC<ContestCarouselProps> = ({ setActivePage, openAu
                 .eq('contest_id', contest.id)
                 .eq('is_winner', true);
               
-              return {
-                  type: 'past',
-                  contestTitle: contest.title,
-                  winners: winnersData?.map(w => ({ username: w.profiles?.username || 'N/A' })) || [],
-                  prizes: contest.prizes,
-                  image_url: contest.image_url,
-              } as PastContestSlide;
+              if (winnersData && winnersData.length > 0) {
+                return {
+                    type: 'past' as const,
+                    contestTitle: contest.title,
+                    winners: winnersData.map(w => ({ username: w.profiles?.username || 'N/A' })),
+                };
+              }
+              return null;
           });
           
-          const pastSlides = await Promise.all(pastContestPromises);
-          fetchedSlides.push(...pastSlides);
-      } else if (pastError && pastError.code !== 'PGRST116') { // Ignore "No rows found"
-          console.error("Error fetching past contests:", pastError.message);
+          const pastSlides = (await Promise.all(pastContestPromises)).filter(Boolean) as PastContestSlide[];
+          finalSlides.push(...pastSlides);
       }
       
-      setSlides(fetchedSlides);
+      setSlides(finalSlides);
       setLoading(false);
     };
 
@@ -111,7 +127,7 @@ const ContestCarousel: React.FC<ContestCarouselProps> = ({ setActivePage, openAu
 
   const handleParticipateClick = () => {
       if (session) {
-          setActivePage(Page.Upload); // The 'Social' page contains Contests component
+          setActivePage(Page.Upload);
       } else {
           openAuthModal();
       }
@@ -120,6 +136,57 @@ const ContestCarousel: React.FC<ContestCarouselProps> = ({ setActivePage, openAu
   if (loading || slides.length === 0) {
     return null;
   }
+
+  const renderSlide = (slide: CarouselSlide) => {
+      switch(slide.type) {
+          case 'active':
+            return (
+                <div className="flex items-center gap-4">
+                    {slide.image_url && 
+                        <div className="w-1/4 flex-shrink-0">
+                            <img src={slide.image_url} alt={slide.title} className="w-full rounded-md object-cover aspect-square" />
+                        </div>
+                    }
+                    <div className="flex-1">
+                        <h3 className="text-lg font-bold font-montserrat text-golden-yellow mb-2">{slide.title}</h3>
+                        {slide.prizes && (
+                            <p className="text-white/80 text-sm whitespace-pre-wrap mb-4"><span className="font-semibold">{t('prizes')}:</span> {slide.prizes}</p>
+                        )}
+                        <button
+                            onClick={handleParticipateClick}
+                            className="bg-golden-yellow text-marine-blue font-bold py-2 px-6 rounded-full hover:bg-yellow-400 transition-colors text-sm"
+                        >
+                            {t('participateNow')}
+                        </button>
+                    </div>
+                </div>
+            );
+          case 'upcoming':
+            return (
+                <div className="flex items-center gap-4">
+                    {slide.image_url && 
+                        <div className="w-1/4 flex-shrink-0">
+                            <img src={slide.image_url} alt={slide.title} className="w-full rounded-md object-cover aspect-square" />
+                        </div>
+                    }
+                    <div className="flex-1">
+                        <p className="text-sm font-bold text-golden-yellow mb-2">{t('comingSoon')}</p>
+                        <h3 className="text-lg font-bold font-montserrat text-white mb-2">{slide.title}</h3>
+                        <p className="text-white/80 text-xs">{t('pollStartsOn', { date: new Date(slide.start_date).toLocaleString() })}</p>
+                    </div>
+                </div>
+            );
+          case 'past':
+            return (
+                <div className="flex flex-col items-center justify-center text-center py-4">
+                    <TrophyIcon className="w-12 h-12 text-golden-yellow mb-2"/>
+                    <h3 className="text-lg font-bold font-montserrat text-white mb-2">{t('winnerCardTitle')}</h3>
+                    <p className="text-sm text-white/80 mb-1 font-semibold">{slide.contestTitle}</p>
+                    <p className="text-white/90 text-md line-clamp-2">{slide.winners.map(w => w.username).join(', ')}</p>
+                </div>
+            );
+      }
+  };
 
   return (
     <div>
@@ -132,53 +199,7 @@ const ContestCarousel: React.FC<ContestCarouselProps> = ({ setActivePage, openAu
           {slides.map((slide, index) => (
             <div key={index} className="w-full flex-shrink-0">
                 <div className="bg-marine-blue-darker p-4 rounded-lg shadow-lg border-l-4 border-golden-yellow min-h-[172px] flex flex-col justify-center">
-                    { slide.type === 'active' ? (
-                        <div className="flex items-center gap-4">
-                            {slide.image_url && 
-                                <div className="w-1/4 flex-shrink-0">
-                                    <img src={slide.image_url} alt={slide.title} className="w-full rounded-md object-cover aspect-square" />
-                                </div>
-                            }
-                            <div className="flex-1">
-                                <h3 className="text-lg font-bold font-montserrat text-golden-yellow mb-2">{slide.title}</h3>
-                                {slide.prizes && (
-                                    <p className="text-white/80 text-sm whitespace-pre-wrap mb-4"><span className="font-semibold">{t('prizes')}:</span> {slide.prizes}</p>
-                                )}
-                                <button
-                                    onClick={handleParticipateClick}
-                                    className="bg-golden-yellow text-marine-blue font-bold py-2 px-6 rounded-full hover:bg-yellow-400 transition-colors text-sm"
-                                >
-                                    {t('participateNow')}
-                                </button>
-                            </div>
-                        </div>
-                    ) : ( // PastContestSlide
-                        slide.winners.length > 0 ? (
-                            <div className="flex flex-col items-center justify-center text-center py-4">
-                               <TrophyIcon className="w-12 h-12 text-golden-yellow mb-2"/>
-                               <h3 className="text-lg font-bold font-montserrat text-white mb-2">{t('winnerCardTitle')}</h3>
-                               <p className="text-sm text-white/80 mb-1 font-semibold">{slide.contestTitle}</p>
-                               <p className="text-white/90 text-md line-clamp-2">{slide.winners.map(w => w.username).join(', ')}</p>
-                            </div>
-                        ) : (
-                             <div className="flex items-center gap-4">
-                                {slide.image_url && 
-                                    <div className="w-1/4 flex-shrink-0">
-                                        <img src={slide.image_url} alt={slide.contestTitle} className="w-full rounded-md object-cover aspect-square" />
-                                    </div>
-                                }
-                                <div className="flex-1">
-                                    <h3 className="text-lg font-bold font-montserrat text-golden-yellow mb-2">{slide.contestTitle}</h3>
-                                    {slide.prizes && (
-                                        <p className="text-white/80 text-sm whitespace-pre-wrap mb-4"><span className="font-semibold">{t('prizes')}:</span> {slide.prizes}</p>
-                                    )}
-                                    <div className="bg-red-500/10 p-2 rounded-md text-center">
-                                        <p className="text-sm text-red-300">{t('contestEnded')}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        )
-                    )}
+                    {renderSlide(slide)}
                 </div>
             </div>
           ))}

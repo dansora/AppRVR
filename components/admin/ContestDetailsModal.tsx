@@ -85,14 +85,15 @@ const ContestDetailsModal: React.FC<ContestDetailsModalProps> = ({ contest, onCl
       const newWinners = shuffled.slice(0, prizesToAward);
       const newWinnerIds = newWinners.map(w => w.user_id);
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('contest_participants')
         .update({ is_winner: true })
         .in('user_id', newWinnerIds)
-        .eq('contest_id', contest.id);
+        .eq('contest_id', contest.id)
+        .select();
 
-      if (error) {
-        setMessage({ type: 'error', text: t('winnerSelectedError') });
+      if (error || !data || data.length === 0) {
+        setMessage({ type: 'error', text: `${t('winnerSelectedError')}: ${error?.message || 'Update failed to return data.'}` });
       } else {
         setMessage({ type: 'success', text: t('winnerSelectedSuccess') });
         onUpdate(); // Update the main list

@@ -14,6 +14,7 @@ interface Contest {
   end_date: string;
   is_active: boolean;
   number_of_prizes: number;
+  contest_participants: { is_winner: boolean }[];
 }
 
 interface EditContestModalProps {
@@ -47,6 +48,28 @@ const EditContestModal: React.FC<EditContestModalProps> = ({ contest, onClose, o
   const [newImageFile, setNewImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(contest.image_url);
 
+  const getContestStatus = (c: Contest) => {
+    const now = new Date();
+    const start = new Date(c.start_date);
+    const end = new Date(c.end_date);
+    const winnerCount = c.contest_participants?.filter(p => p.is_winner).length || 0;
+
+    if (!c.is_active) {
+        return { text: t('contestStatusInactive'), color: 'bg-gray-500' };
+    }
+    if (end < now) {
+        if (winnerCount > 0) {
+             return { text: t('contestStatusWinnerSelected'), color: 'bg-purple-600' };
+        }
+        return { text: t('contestStatusExpired'), color: 'bg-red-600' };
+    }
+    if (start > now) {
+        return { text: t('contestStatusScheduled'), color: 'bg-blue-600' };
+    }
+    
+    return { text: t('contestStatusActive'), color: 'bg-green-600' };
+  };
+
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
         const file = e.target.files[0];
@@ -73,9 +96,10 @@ const EditContestModal: React.FC<EditContestModalProps> = ({ contest, onClose, o
         if (newImageFile) {
             // Delete old image if it exists
             if (contest.image_url) {
-                const oldFilePath = contest.image_url.split('/').pop()?.split('?')[0];
-                if (oldFilePath) {
-                    await supabase.storage.from('contests-images').remove([`public/${oldFilePath}`]);
+                const oldFilePathParts = contest.image_url.split('/');
+                const oldFileName = oldFilePathParts[oldFilePathParts.length - 1];
+                if (oldFileName) {
+                    await supabase.storage.from('contests-images').remove([`public/${oldFileName}`]);
                 }
             }
             // Upload new image
@@ -111,6 +135,8 @@ const EditContestModal: React.FC<EditContestModalProps> = ({ contest, onClose, o
         setLoading(false);
     }
   };
+
+  const status = getContestStatus(contest);
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
@@ -154,8 +180,13 @@ const EditContestModal: React.FC<EditContestModalProps> = ({ contest, onClose, o
                         {imagePreview && <img src={imagePreview} alt="Preview" className="mt-2 w-32 h-32 object-cover rounded-md" />}
                     </div>
                     
-                    <div className="flex items-center gap-4">
-                        <label className="block text-sm font-medium text-white/80">Status</label>
+                    <div className="flex items-center gap-4 border-t border-white/10 pt-4">
+                        <label className="block text-sm font-medium text-white/80">Status:</label>
+                         <span className={`font-bold py-1 px-3 rounded-full text-white text-sm w-32 text-center ${status.color}`}>
+                            {status.text}
+                        </span>
+                        <div className="flex-grow"></div>
+                        <label htmlFor="is_active_toggle" className="text-sm font-medium text-white/80">Manual:</label>
                         <button type="button" onClick={() => setIsActive(!isActive)} className={`font-bold py-1 px-3 rounded-full text-sm w-28 text-center transition-colors ${isActive ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-500 hover:bg-gray-600'}`}>
                             {isActive ? t('adStatusActive') : t('adStatusInactive')}
                         </button>
