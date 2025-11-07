@@ -13,7 +13,7 @@ interface Contest {
 interface Participant {
   user_id: string;
   is_winner: boolean;
-  email: string | null;
+  email?: string | null; // Made optional
   profiles: {
     username: string;
   } | null;
@@ -35,13 +35,30 @@ const ContestDetailsModal: React.FC<ContestDetailsModalProps> = ({ contest, onCl
     setLoading(true);
     setMessage(null);
     
+    // Attempt to fetch with email
     const { data: participantsData, error: participantsError } = await supabase
       .from('contest_participants')
       .select('user_id, is_winner, email, profiles(username)')
       .eq('contest_id', contest.id);
 
     if (participantsError) {
-      setMessage({ type: 'error', text: participantsError.message });
+        if (participantsError.code === '42703') { // undefined column 'email'
+            console.warn("Fetching contest participants without email column.");
+            // Fallback: fetch without email
+            const { data: retryData, error: retryError } = await supabase
+                .from('contest_participants')
+                .select('user_id, is_winner, profiles(username)')
+                .eq('contest_id', contest.id);
+            
+            if (retryError) {
+                 setMessage({ type: 'error', text: retryError.message });
+            } else {
+                 setMessage({ type: 'error', text: 'Email column is missing from participants table. Please run the provided SQL script to enable emailing winners.' });
+                 setParticipants(retryData as Participant[] || []);
+            }
+        } else {
+            setMessage({ type: 'error', text: participantsError.message });
+        }
     } else {
       setParticipants(participantsData as Participant[] || []);
     }

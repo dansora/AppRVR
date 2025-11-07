@@ -64,22 +64,36 @@ const Contests: React.FC = () => {
     if (!session?.user) return;
     setMessage(null);
 
+    // First attempt: insert with email (preferred)
     const { error } = await supabase.from('contest_participants').insert({
       contest_id: contestId,
       user_id: session.user.id,
-      // NOTE: This assumes an 'email' column has been added to the 'contest_participants' table.
       email: session.user.email,
     });
 
     if (error) {
-      if (error.code === '23505') { // unique constraint violation
-        setMessage({ contestId, type: 'error', text: t('alreadyParticipated') });
-      } else {
-        setMessage({ contestId, type: 'error', text: t('participationError') });
-      }
+        if (error.code === '23505') { // unique constraint violation
+            setMessage({ contestId, type: 'error', text: t('alreadyParticipated') });
+        } else if (error.code === '42703') { // undefined column 'email'
+            console.warn("Attempting contest participation without email column.");
+            // Fallback attempt: insert without email
+            const { error: retryError } = await supabase.from('contest_participants').insert({
+                contest_id: contestId,
+                user_id: session.user.id,
+            });
+
+            if (retryError) {
+                setMessage({ contestId, type: 'error', text: t('participationError') });
+            } else {
+                setMessage({ contestId, type: 'success', text: t('participationSuccess') });
+                fetchContests(); // Refresh participation status
+            }
+        } else {
+            setMessage({ contestId, type: 'error', text: t('participationError') });
+        }
     } else {
-      setMessage({ contestId, type: 'success', text: t('participationSuccess') });
-      fetchContests(); // Refresh participation status
+        setMessage({ contestId, type: 'success', text: t('participationSuccess') });
+        fetchContests(); // Refresh participation status
     }
   };
 
