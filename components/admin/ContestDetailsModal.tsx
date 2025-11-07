@@ -79,26 +79,37 @@ const ContestDetailsModal: React.FC<ContestDetailsModalProps> = ({ contest, onCl
     const prizesToAward = contest.number_of_prizes - winners.length;
 
     if (nonWinners.length === 0 || prizesToAward <= 0) return;
+
     if (window.confirm(t('confirmWinnerSelection'))) {
-      
+      setLoading(true);
+
       const shuffled = nonWinners.sort(() => 0.5 - Math.random());
       const newWinners = shuffled.slice(0, prizesToAward);
       const newWinnerIds = newWinners.map(w => w.user_id);
+      
+      const updatePromises = newWinnerIds.map(userId => 
+        supabase
+          .from('contest_participants')
+          .update({ is_winner: true })
+          .eq('user_id', userId)
+          .eq('contest_id', contest.id)
+      );
 
-      // Removed .select() to avoid RLS issues on select after update.
-      // We will assume success if no error is thrown.
-      const { error } = await supabase
-        .from('contest_participants')
-        .update({ is_winner: true })
-        .in('user_id', newWinnerIds)
-        .eq('contest_id', contest.id);
+      try {
+        const results = await Promise.all(updatePromises);
+        
+        const firstError = results.find(res => res.error)?.error;
+        if (firstError) {
+          throw firstError;
+        }
 
-      if (error) {
-        setMessage({ type: 'error', text: `${t('winnerSelectedError')}: ${error.message}` });
-      } else {
         setMessage({ type: 'success', text: t('winnerSelectedSuccess') });
-        onUpdate(); // Update the main list
-        fetchDetails(); // Refresh this modal's data
+        onUpdate();
+        fetchDetails();
+      } catch (error: any) {
+        setMessage({ type: 'error', text: `${t('winnerSelectedError')}: ${error.message}` });
+      } finally {
+        setLoading(false);
       }
     }
   };
@@ -133,7 +144,7 @@ const ContestDetailsModal: React.FC<ContestDetailsModalProps> = ({ contest, onCl
                     </div>
                 )}
 
-                {loading ? <p>{t('newsLoading')}</p> : (
+                {loading && !message ? <p>{t('newsLoading')}</p> : (
                     <>
                         {/* Winner Section */}
                         <div className="bg-marine-blue-darker/50 p-4 rounded-lg mb-4">
@@ -165,10 +176,14 @@ const ContestDetailsModal: React.FC<ContestDetailsModalProps> = ({ contest, onCl
                             {isContestEnded && !allPrizesAwarded && (
                                 <button
                                     onClick={handleSelectWinners}
-                                    disabled={participants.filter(p => !p.is_winner).length === 0}
-                                    className="w-full mt-4 bg-golden-yellow text-marine-blue font-bold py-2 rounded-full disabled:opacity-50"
+                                    disabled={participants.filter(p => !p.is_winner).length === 0 || loading}
+                                    className="w-full mt-4 bg-golden-yellow text-marine-blue font-bold py-2 rounded-full disabled:opacity-50 flex items-center justify-center"
                                 >
-                                    {t('selectRemainingWinners')}
+                                    {loading ? (
+                                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                    ) : (
+                                        t('selectRemainingWinners')
+                                    )}
                                 </button>
                             )}
 
