@@ -73,7 +73,7 @@ const ContestCarousel: React.FC<ContestCarouselProps> = ({ setActivePage, openAu
           const pastContestPromises = pastContests.map(async (contest) => {
               const { data: winnersData } = await supabase
                 .from('contest_participants')
-                .select('profiles(username)')
+                .select('profiles!left(username)')
                 .eq('contest_id', contest.id)
                 .eq('is_winner', true);
               

@@ -40,7 +40,7 @@ const ContestDetailsModal: React.FC<ContestDetailsModalProps> = ({ contest, onCl
     // Attempt to fetch with email
     const { data: participantsData, error: participantsError } = await supabase
       .from('contest_participants')
-      .select('user_id, is_winner, email, profiles(username)')
+      .select('user_id, is_winner, email, profiles!left(username)')
       .eq('contest_id', contest.id);
 
     if (participantsError) {
@@ -50,7 +50,7 @@ const ContestDetailsModal: React.FC<ContestDetailsModalProps> = ({ contest, onCl
             // Fallback: fetch without email
             const { data: retryData, error: retryError } = await supabase
                 .from('contest_participants')
-                .select('user_id, is_winner, profiles(username)')
+                .select('user_id, is_winner, profiles!left(username)')
                 .eq('contest_id', contest.id);
             
             if (retryError) {

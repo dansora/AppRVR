@@ -133,15 +133,16 @@ const ContestsManager: React.FC<ContestsManagerProps> = ({ onBack }) => {
     if (!contest.is_active) {
         return { text: t('contestStatusInactive'), color: 'bg-gray-500' };
     }
-    if (winnerCount > 0) {
-        return { text: t('contestStatusWinnerSelected'), color: 'bg-purple-600' };
-    }
     if (end < now) {
+        if (winnerCount > 0) {
+             return { text: t('contestStatusWinnerSelected'), color: 'bg-purple-600' };
+        }
         return { text: t('contestStatusExpired'), color: 'bg-red-600' };
     }
     if (start > now) {
         return { text: t('contestStatusScheduled'), color: 'bg-blue-600' };
     }
+    
     return { text: t('contestStatusActive'), color: 'bg-green-600' };
   };
 
