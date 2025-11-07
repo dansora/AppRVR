@@ -87,6 +87,7 @@ const ContestDetailsModal: React.FC<ContestDetailsModalProps> = ({ contest, onCl
       const newWinners = shuffled.slice(0, prizesToAward);
       const newWinnerIds = newWinners.map(w => w.user_id);
       
+      // Create an array of update promises, one for each new winner.
       const updatePromises = newWinnerIds.map(userId => 
         supabase
           .from('contest_participants')
@@ -96,16 +97,18 @@ const ContestDetailsModal: React.FC<ContestDetailsModalProps> = ({ contest, onCl
       );
 
       try {
+        // Execute all update promises in parallel.
         const results = await Promise.all(updatePromises);
         
+        // Check if any of the individual updates failed.
         const firstError = results.find(res => res.error)?.error;
         if (firstError) {
           throw firstError;
         }
 
         setMessage({ type: 'success', text: t('winnerSelectedSuccess') });
-        onUpdate();
-        fetchDetails();
+        onUpdate(); // Propagate update to parent component (ContestsManager)
+        fetchDetails(); // Re-fetch details for this modal
       } catch (error: any) {
         setMessage({ type: 'error', text: `${t('winnerSelectedError')}: ${error.message}` });
       } finally {
