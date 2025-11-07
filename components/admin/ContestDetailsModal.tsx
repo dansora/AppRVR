@@ -29,40 +29,36 @@ const ContestDetailsModal: React.FC<ContestDetailsModalProps> = ({ contest, onCl
   const { t } = useLanguage();
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  const [isSelectingWinners, setIsSelectingWinners] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error' | 'info', text: string, details?: string } | null>(null);
   const [emailColumnExists, setEmailColumnExists] = useState(true);
 
   const fetchDetails = useCallback(async () => {
     setLoading(true);
     setMessage(null);
-    setEmailColumnExists(true); // Assume it exists initially
+    setEmailColumnExists(true);
     
-    // Attempt to fetch with email
-    const { data: participantsData, error: participantsError } = await supabase
+    const { data, error } = await supabase
       .from('contest_participants')
       .select('user_id, is_winner, email, profiles!left(username)')
       .eq('contest_id', contest.id);
 
-    if (participantsError) {
-        if (participantsError.code === '42703') { // undefined column 'email'
+    if (error) {
+        if (error.code === '42703') { // undefined column 'email'
             console.warn("Fetching contest participants without email column.");
             setEmailColumnExists(false);
-            // Fallback: fetch without email
             const { data: retryData, error: retryError } = await supabase
                 .from('contest_participants')
                 .select('user_id, is_winner, profiles!left(username)')
                 .eq('contest_id', contest.id);
             
-            if (retryError) {
-                 setMessage({ type: 'error', text: retryError.message });
-            } else {
-                 setParticipants(retryData as Participant[] || []);
-            }
+            if (retryError) setMessage({ type: 'error', text: retryError.message });
+            else setParticipants(retryData as Participant[] || []);
         } else {
-            setMessage({ type: 'error', text: participantsError.message });
+            setMessage({ type: 'error', text: error.message });
         }
     } else {
-      setParticipants(participantsData as Participant[] || []);
+      setParticipants(data as Participant[] || []);
     }
 
     setLoading(false);
@@ -81,13 +77,12 @@ const ContestDetailsModal: React.FC<ContestDetailsModalProps> = ({ contest, onCl
     if (nonWinners.length === 0 || prizesToAward <= 0) return;
 
     if (window.confirm(t('confirmWinnerSelection'))) {
-      setLoading(true);
+      setIsSelectingWinners(true);
 
       const shuffled = nonWinners.sort(() => 0.5 - Math.random());
       const newWinners = shuffled.slice(0, prizesToAward);
       const newWinnerIds = newWinners.map(w => w.user_id);
       
-      // Create an array of update promises, one for each new winner.
       const updatePromises = newWinnerIds.map(userId => 
         supabase
           .from('contest_participants')
@@ -97,22 +92,25 @@ const ContestDetailsModal: React.FC<ContestDetailsModalProps> = ({ contest, onCl
       );
 
       try {
-        // Execute all update promises in parallel.
         const results = await Promise.all(updatePromises);
-        
-        // Check if any of the individual updates failed.
         const firstError = results.find(res => res.error)?.error;
-        if (firstError) {
-          throw firstError;
-        }
+        if (firstError) throw firstError;
 
         setMessage({ type: 'success', text: t('winnerSelectedSuccess') });
-        onUpdate(); // Propagate update to parent component (ContestsManager)
-        fetchDetails(); // Re-fetch details for this modal
+        onUpdate();
+        fetchDetails();
       } catch (error: any) {
-        setMessage({ type: 'error', text: `${t('winnerSelectedError')}: ${error.message}` });
+        if (error.message && error.message.includes('violates row-level security policy')) {
+            const rlsPolicySql = `CREATE POLICY "Allow admin to update participants"
+ON public.contest_participants
+FOR UPDATE
+USING ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin'::text);`;
+            setMessage({ type: 'error', text: t('winnerSelectionRLSError'), details: rlsPolicySql });
+        } else {
+            setMessage({ type: 'error', text: `${t('winnerSelectedError')}: ${error.message}` });
+        }
       } finally {
-        setLoading(false);
+        setIsSelectingWinners(false);
       }
     }
   };
@@ -131,7 +129,23 @@ const ContestDetailsModal: React.FC<ContestDetailsModalProps> = ({ contest, onCl
             <div className="p-6 overflow-y-auto">
                 <h3 className="text-lg font-bold mb-4">{contest.title}</h3>
                 
-                {message && <p className={`p-2 rounded-md mb-4 text-sm text-center ${message.type === 'success' ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'}`}>{message.text}</p>}
+                {message && (
+                    <div className={`p-4 rounded-lg mb-4 text-sm ${
+                        message.type === 'success' ? 'bg-green-500/20 text-green-300' :
+                        message.type === 'info' ? 'bg-blue-900/50 text-blue-300' :
+                        'bg-red-500/20 text-red-300'
+                    }`}>
+                        <p className="font-bold">{message.text}</p>
+                        {message.details && (
+                             <>
+                                <p className="mt-2">{t('winnerSelectionRLSInstruction')}</p>
+                                <pre className="bg-marine-blue-darkest p-2 mt-2 rounded-md text-xs text-white/90 overflow-x-auto">
+                                    <code>{message.details}</code>
+                                </pre>
+                             </>
+                        )}
+                    </div>
+                )}
 
                 {!emailColumnExists && (
                     <div className="bg-blue-900/50 border border-blue-600 p-4 rounded-lg mb-4 text-sm">
@@ -149,7 +163,6 @@ const ContestDetailsModal: React.FC<ContestDetailsModalProps> = ({ contest, onCl
 
                 {loading && !message ? <p>{t('newsLoading')}</p> : (
                     <>
-                        {/* Winner Section */}
                         <div className="bg-marine-blue-darker/50 p-4 rounded-lg mb-4">
                             <h4 className="font-bold text-lg text-golden-yellow flex items-center gap-2">
                                 <TrophyIcon className="w-5 h-5"/> {t('winners')}
@@ -179,24 +192,20 @@ const ContestDetailsModal: React.FC<ContestDetailsModalProps> = ({ contest, onCl
                             {isContestEnded && !allPrizesAwarded && (
                                 <button
                                     onClick={handleSelectWinners}
-                                    disabled={participants.filter(p => !p.is_winner).length === 0 || loading}
+                                    disabled={participants.filter(p => !p.is_winner).length === 0 || isSelectingWinners}
                                     className="w-full mt-4 bg-golden-yellow text-marine-blue font-bold py-2 rounded-full disabled:opacity-50 flex items-center justify-center"
                                 >
-                                    {loading ? (
-                                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                    {isSelectingWinners ? (
+                                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                                     ) : (
                                         t('selectRemainingWinners')
                                     )}
                                 </button>
                             )}
-
-                            {isContestEnded && allPrizesAwarded && (
-                                <p className="text-sm text-center font-semibold text-green-400 mt-4">{t('allPrizesAwarded')}</p>
-                            )}
-                             {!isContestEnded && <p className="text-sm text-center text-white/70 mt-4">Câștigătorii pot fi aleși după încheierea concursului.</p>}
+                            {isContestEnded && allPrizesAwarded && <p className="text-sm text-center font-semibold text-green-400 mt-4">{t('allPrizesAwarded')}</p>}
+                            {!isContestEnded && <p className="text-sm text-center text-white/70 mt-4">Câștigătorii pot fi aleși după încheierea concursului.</p>}
                         </div>
                         
-                        {/* Participants List */}
                         <div>
                             <h4 className="font-bold text-lg mb-2">{t('participants')} ({participants.length})</h4>
                             {participants.length > 0 ? (
@@ -208,9 +217,7 @@ const ContestDetailsModal: React.FC<ContestDetailsModalProps> = ({ contest, onCl
                                         </div>
                                     ))}
                                 </div>
-                            ) : (
-                                <p className="text-white/70">{t('noParticipants')}</p>
-                            )}
+                            ) : <p className="text-white/70">{t('noParticipants')}</p>}
                         </div>
                     </>
                 )}

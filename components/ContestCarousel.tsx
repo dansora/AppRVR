@@ -50,65 +50,62 @@ const ContestCarousel: React.FC<ContestCarouselProps> = ({ setActivePage, openAu
     const fetchContestData = async () => {
       setLoading(true);
       const now = new Date().toISOString();
-      let finalSlides: CarouselSlide[] = [];
+      const finalSlides: CarouselSlide[] = [];
 
-      // 1. Fetch active contests
-      const { data: activeData } = await supabase
+      // Fetch active and upcoming contests in one go
+      const { data: futureContests, error: futureError } = await supabase
         .from('contests')
-        .select('id, title, prizes, image_url')
+        .select('id, title, prizes, image_url, start_date, end_date')
         .eq('is_active', true)
-        .lte('start_date', now)
         .gte('end_date', now)
-        .order('end_date', { ascending: true });
-        
-      if (activeData && activeData.length > 0) {
-        finalSlides.push(...activeData.map(c => ({ ...c, type: 'active' as const })));
-      } else {
-        // 2. If no active contests, fetch the next upcoming one
-        const { data: upcomingData } = await supabase
-          .from('contests')
-          .select('id, title, prizes, image_url, start_date')
-          .eq('is_active', true)
-          .gt('start_date', now)
-          .order('start_date', { ascending: true })
-          .limit(1);
-        
-        if (upcomingData && upcomingData.length > 0) {
-          finalSlides.push(...upcomingData.map(c => ({ ...c, type: 'upcoming' as const })));
-        }
+        .order('start_date', { ascending: true });
+
+      if (futureError) console.error("Error fetching active/upcoming contests:", futureError);
+
+      const activeContests = futureContests?.filter(c => c.start_date <= now) || [];
+      const upcomingContests = futureContests?.filter(c => c.start_date > now) || [];
+
+      // Add all active contests
+      if (activeContests.length > 0) {
+        finalSlides.push(...activeContests.map(c => ({ ...c, type: 'active' as const })));
+      } 
+      // If no active contests, add the single next upcoming one
+      else if (upcomingContests.length > 0) {
+        finalSlides.push({ ...upcomingContests[0], type: 'upcoming' as const });
       }
 
-      // 3. Fetch up to 3 most recent contests that have winners
-      const { data: pastContests } = await supabase
+      // Fetch up to 3 most recent past contests that have winners
+      const { data: pastContests, error: pastError } = await supabase
         .from('contests')
-        .select('id, title, prizes, image_url')
-        .lt('end_date', now)
+        .select('id, title')
+        .eq('is_active', true)
+        .lte('end_date', now)
         .order('end_date', { ascending: false })
         .limit(3);
-      
+
+      if (pastError) console.error("Error fetching past contests:", pastError);
+
       if (pastContests) {
-          const pastContestPromises = pastContests.map(async (contest) => {
-              const { data: winnersData } = await supabase
+          for (const contest of pastContests) {
+              const { data: winnersData, error: winnersError } = await supabase
                 .from('contest_participants')
                 .select('profiles!left(username)')
                 .eq('contest_id', contest.id)
                 .eq('is_winner', true);
               
+              if (winnersError) continue;
+
               if (winnersData && winnersData.length > 0) {
-                return {
+                finalSlides.push({
                     type: 'past' as const,
                     contestTitle: contest.title,
-                    winners: winnersData.map(w => ({ username: w.profiles?.username || 'N/A' })),
-                };
+                    winners: winnersData.map(w => ({ username: w.profiles?.username || 'N/A' })).filter(w => w.username !== 'N/A'),
+                });
               }
-              return null;
-          });
-          
-          const pastSlides = (await Promise.all(pastContestPromises)).filter(Boolean) as PastContestSlide[];
-          finalSlides.push(...pastSlides);
+          }
       }
       
-      setSlides(finalSlides);
+      setSlides(finalSlides.filter(s => s.type !== 'past' || (s.type === 'past' && s.winners.length > 0)));
       setLoading(false);
     };
 
