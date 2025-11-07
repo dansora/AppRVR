@@ -30,10 +30,12 @@ const ContestDetailsModal: React.FC<ContestDetailsModalProps> = ({ contest, onCl
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  const [emailColumnExists, setEmailColumnExists] = useState(true);
 
   const fetchDetails = useCallback(async () => {
     setLoading(true);
     setMessage(null);
+    setEmailColumnExists(true); // Assume it exists initially
     
     // Attempt to fetch with email
     const { data: participantsData, error: participantsError } = await supabase
@@ -44,6 +46,7 @@ const ContestDetailsModal: React.FC<ContestDetailsModalProps> = ({ contest, onCl
     if (participantsError) {
         if (participantsError.code === '42703') { // undefined column 'email'
             console.warn("Fetching contest participants without email column.");
+            setEmailColumnExists(false);
             // Fallback: fetch without email
             const { data: retryData, error: retryError } = await supabase
                 .from('contest_participants')
@@ -53,7 +56,6 @@ const ContestDetailsModal: React.FC<ContestDetailsModalProps> = ({ contest, onCl
             if (retryError) {
                  setMessage({ type: 'error', text: retryError.message });
             } else {
-                 setMessage({ type: 'error', text: 'Email column is missing from participants table. Please run the provided SQL script to enable emailing winners.' });
                  setParticipants(retryData as Participant[] || []);
             }
         } else {
@@ -114,6 +116,20 @@ const ContestDetailsModal: React.FC<ContestDetailsModalProps> = ({ contest, onCl
                 <h3 className="text-lg font-bold mb-4">{contest.title}</h3>
                 
                 {message && <p className={`p-2 rounded-md mb-4 text-sm text-center ${message.type === 'success' ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'}`}>{message.text}</p>}
+
+                {!emailColumnExists && (
+                    <div className="bg-blue-900/50 border border-blue-600 p-4 rounded-lg mb-4 text-sm">
+                        <p className="font-bold text-blue-300 mb-2">{t('adminContestEmailFeatureTitle')}</p>
+                        <p className="text-blue-300/90 mb-3">{t('adminContestEmailFeatureDesc')}</p>
+                        <p className="text-blue-300/90 mb-2">{t('adminContestEmailFeatureHowTo')}</p>
+                        <pre className="bg-marine-blue-darkest p-2 rounded-md text-xs text-white/90 overflow-x-auto">
+                            <code>
+                                ALTER TABLE public.contest_participants<br/>
+                                ADD COLUMN IF NOT EXISTS email text;
+                            </code>
+                        </pre>
+                    </div>
+                )}
 
                 {loading ? <p>{t('newsLoading')}</p> : (
                     <>
