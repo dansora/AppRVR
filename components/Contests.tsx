@@ -67,6 +67,8 @@ const Contests: React.FC = () => {
     const { error } = await supabase.from('contest_participants').insert({
       contest_id: contestId,
       user_id: session.user.id,
+      // NOTE: This assumes an 'email' column has been added to the 'contest_participants' table.
+      email: session.user.email,
     });
 
     if (error) {

@@ -13,6 +13,7 @@ interface Contest {
 interface Participant {
   user_id: string;
   is_winner: boolean;
+  email: string | null;
   profiles: {
     username: string;
   } | null;
@@ -36,7 +37,7 @@ const ContestDetailsModal: React.FC<ContestDetailsModalProps> = ({ contest, onCl
     
     const { data: participantsData, error: participantsError } = await supabase
       .from('contest_participants')
-      .select('user_id, is_winner, profiles!inner(username)')
+      .select('user_id, is_winner, email, profiles(username)')
       .eq('contest_id', contest.id);
 
     if (participantsError) {
@@ -107,11 +108,20 @@ const ContestDetailsModal: React.FC<ContestDetailsModalProps> = ({ contest, onCl
                             <p className="text-white/80 mb-4">{t('contestWinnersCount', { count: String(winners.length), total: String(contest.number_of_prizes) })}</p>
 
                             {winners.length > 0 && (
-                                <div className="space-y-1">
+                                <div className="space-y-2">
                                     {winners.map(w => (
-                                        <div key={w.user_id} className="flex items-center gap-2 text-green-300">
-                                            <TrophyIcon className="w-4 h-4" />
-                                            <p className="font-semibold">{w.profiles?.username || 'N/A'}</p>
+                                        <div key={w.user_id} className="flex items-center justify-between gap-2 bg-green-900/50 p-2 rounded">
+                                            <div className="flex items-center gap-2 text-green-300">
+                                                <TrophyIcon className="w-4 h-4" />
+                                                <p className="font-semibold">{w.profiles?.username || 'N/A'}</p>
+                                            </div>
+                                            {w.email && (
+                                                <a href={`mailto:${w.email}?subject=Congratulations! You won the RVR contest: ${contest.title}&body=Hello ${w.profiles?.username || ''},%0D%0A%0D%0APlease reply to this email with your full name and shipping address to receive your prize.%0D%0A%0D%0AThank you,%0D%0ARVR Team`}
+                                                   className="p-1.5 bg-blue-600 rounded-full hover:bg-blue-500 transition-colors"
+                                                   title={`${t('emailWinner')}: ${w.email}`}>
+                                                    <MailIcon className="w-4 h-4 text-white" />
+                                                </a>
+                                            )}
                                         </div>
                                     ))}
                                 </div>

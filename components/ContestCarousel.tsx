@@ -16,6 +16,11 @@ interface Winner {
     username: string;
 }
 
+interface WinnerSlide {
+    contestTitle: string;
+    winners: Winner[];
+}
+
 interface ContestCarouselProps {
     setActivePage: (page: Page) => void;
     openAuthModal: () => void;
@@ -25,7 +30,7 @@ const ContestCarousel: React.FC<ContestCarouselProps> = ({ setActivePage, openAu
   const { t } = useLanguage();
   const { session } = useProfile();
   const [activeContests, setActiveContests] = useState<Contest[]>([]);
-  const [latestWinners, setLatestWinners] = useState<Winner[]>([]);
+  const [winnerSlides, setWinnerSlides] = useState<WinnerSlide[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
 
@@ -49,30 +54,42 @@ const ContestCarousel: React.FC<ContestCarouselProps> = ({ setActivePage, openAu
         setActiveContests(activeData || []);
       }
 
-      // Fetch the most recent contest that has ended
-      const { data: pastContest, error: pastError } = await supabase
+      // Fetch up to 3 most recent contests that have ended
+      const { data: pastContests, error: pastError } = await supabase
         .from('contests')
-        .select('id')
+        .select('id, title')
         .lt('end_date', now)
         .order('end_date', { ascending: false })
-        .limit(1)
-        .single();
+        .limit(3);
       
-      if (pastContest) {
-          const { data: winnersData, error: winnersError } = await supabase
-            .from('contest_participants')
-            .select('profiles(username)')
-            .eq('contest_id', pastContest.id)
-            .eq('is_winner', true);
+      if (pastContests) {
+          const winnerPromises = pastContests.map(async (contest) => {
+              const { data: winnersData, error: winnersError } = await supabase
+                .from('contest_participants')
+                .select('profiles(username)')
+                .eq('contest_id', contest.id)
+                .eq('is_winner', true);
+              
+              if (winnersError) {
+                  console.error(`Error fetching winners for contest ${contest.id}:`, winnersError.message);
+                  return null;
+              }
 
-          if (winnersData && winnersData.length > 0) {
-              const winners = winnersData.map(w => ({ username: w.profiles?.username || 'N/A' }));
-              setLatestWinners(winners);
-          } else if (winnersError) {
-               console.error("Error fetching winners:", winnersError.message);
-          }
+              if (winnersData && winnersData.length > 0) {
+                  return {
+                      contestTitle: contest.title,
+                      winners: winnersData.map(w => ({ username: w.profiles?.username || 'N/A' }))
+                  };
+              }
+              return null;
+          });
+          
+          const results = await Promise.all(winnerPromises);
+          const validWinnerSlides = results.filter((r): r is WinnerSlide => r !== null);
+          setWinnerSlides(validWinnerSlides);
+
       } else if (pastError && pastError.code !== 'PGRST116') { // Ignore "No rows found"
-          console.error("Error fetching past contest:", pastError.message);
+          console.error("Error fetching past contests:", pastError.message);
       }
 
       setLoading(false);
@@ -81,7 +98,7 @@ const ContestCarousel: React.FC<ContestCarouselProps> = ({ setActivePage, openAu
     fetchContestData();
   }, []);
 
-  const slides = [...activeContests, ...(latestWinners.length > 0 ? [latestWinners] : [])];
+  const slides = [...activeContests, ...winnerSlides];
 
   useEffect(() => {
     if (slides.length > 1) {
@@ -109,8 +126,8 @@ const ContestCarousel: React.FC<ContestCarouselProps> = ({ setActivePage, openAu
     return null;
   }
 
-  const isWinnerSlide = (slide: Contest | Winner[]): slide is Winner[] => {
-    return Array.isArray(slide);
+  const isWinnerSlide = (slide: Contest | WinnerSlide): slide is WinnerSlide => {
+    return 'contestTitle' in slide;
   };
 
   return (
@@ -145,12 +162,13 @@ const ContestCarousel: React.FC<ContestCarouselProps> = ({ setActivePage, openAu
                             </div>
                         </div>
                     </div>
-                ) : ( // It's a Winner array
+                ) : ( // It's a WinnerSlide
                     <div className="bg-marine-blue-darker p-4 rounded-lg shadow-lg border-l-4 border-golden-yellow">
-                        <div className="flex flex-col items-center justify-center text-center h-[172px]">
-                           <TrophyIcon className="w-16 h-16 text-golden-yellow mb-2"/>
+                        <div className="flex flex-col items-center justify-center text-center min-h-[172px] py-4">
+                           <TrophyIcon className="w-12 h-12 text-golden-yellow mb-2"/>
                            <h3 className="text-lg font-bold font-montserrat text-white mb-2">{t('winnerCardTitle')}</h3>
-                           <p className="text-white/90 text-md">{t('lastContestWinners', { usernames: slide.map(w => w.username).join(', ') })}</p>
+                           <p className="text-sm text-white/80 mb-1 font-semibold">{slide.contestTitle}</p>
+                           <p className="text-white/90 text-md line-clamp-2">{slide.winners.map(w => w.username).join(', ')}</p>
                         </div>
                     </div>
                 )}
