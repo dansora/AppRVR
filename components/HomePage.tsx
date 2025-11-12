@@ -67,7 +67,7 @@ const HomePage: React.FC<HomePageProps> = ({ setActivePage, isLoggedIn, openAuth
   ];
 
   const socialLinks = [
-    { href: "https://www.facebook.com/groups/1331920294319593", icon: FacebookIcon },
+    { href: "https://www.facebook.com/groups/radiovocearomanilor", icon: FacebookIcon },
     { href: "https://chat.whatsapp.com/DZzIOARyfbwIq3LUPAiP1G?mode=wwc", icon: WhatsAppIcon },
     { href: "https://www.youtube.com/@radiovocearomanilor8992", icon: YouTubeIcon },
     { href: "https://www.linkedin.com/", icon: LinkedInIcon },

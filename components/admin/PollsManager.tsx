@@ -1,10 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { supabase } from '../../services/supabaseClient';
-import { BackIcon, ChevronRightIcon, CloseIcon } from '../Icons';
+import { BackIcon, ChevronRightIcon, CloseIcon, EditIcon } from '../Icons';
 import PollResultsModal from './PollResultsModal';
+import EditPollModal from './EditPollModal';
 
 type SubView = 'dashboard' | 'create' | 'active' | 'completed';
+
+interface PollOption {
+  id: number;
+  option_text: string;
+  poll_id: number;
+}
 
 interface Poll {
     id: number;
@@ -14,6 +21,7 @@ interface Poll {
     start_date: string;
     end_date: string;
     is_published: boolean;
+    poll_options: PollOption[];
 }
 
 interface PollsManagerProps {
@@ -198,23 +206,25 @@ const ActivePollsPage: React.FC<{onBack: () => void}> = ({ onBack }) => {
     const [polls, setPolls] = useState<Poll[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [editingPoll, setEditingPoll] = useState<Poll | null>(null);
+
+    const fetchPolls = useCallback(async () => {
+        setLoading(true);
+        setError(null);
+        const now = new Date().toISOString();
+        const { data, error } = await supabase.from('polls').select('*, poll_options(*)').gte('end_date', now).order('end_date');
+        if (error) {
+            setError(error.message);
+            console.error(error);
+        } else {
+            setPolls(data as Poll[]);
+        }
+        setLoading(false);
+    }, []);
 
     useEffect(() => {
-        const fetchPolls = async () => {
-            setLoading(true);
-            setError(null);
-            const now = new Date().toISOString();
-            const { data, error } = await supabase.from('polls').select('*').gte('end_date', now).order('end_date');
-            if (error) {
-                setError(error.message);
-                console.error(error);
-            } else {
-                setPolls(data);
-            }
-            setLoading(false);
-        };
         fetchPolls();
-    }, []);
+    }, [fetchPolls]);
 
     return (
          <div className="bg-marine-blue-darker p-6 rounded-lg shadow-md">
@@ -222,14 +232,21 @@ const ActivePollsPage: React.FC<{onBack: () => void}> = ({ onBack }) => {
             {loading ? <p>{t('newsLoading')}</p> : error ? <p className="text-red-400">{t('newsError')}: {error}</p> : polls.length === 0 ? <p>{t('noActivePolls')}</p> : (
                 <div className="space-y-3">
                     {polls.map(poll => (
-                        <div key={poll.id} className="p-4 bg-marine-blue-darkest/50 rounded-md">
-                            <p className="font-bold">{poll.title}</p>
-                            <p className="text-sm text-white/80">{poll.question}</p>
-                            <p className="text-xs text-white/50 mt-1">{t('pollEndsOn', {date: new Date(poll.end_date).toLocaleString()})}</p>
+                        <div key={poll.id} className="p-4 bg-marine-blue-darkest/50 rounded-md flex justify-between items-center">
+                            <div>
+                                <p className="font-bold">{poll.title}</p>
+                                <p className="text-sm text-white/80">{poll.question}</p>
+                                <p className="text-xs text-white/50 mt-1">{t('pollEndsOn', {date: new Date(poll.end_date).toLocaleString()})}</p>
+                            </div>
+                            <button onClick={() => setEditingPoll(poll)} className="bg-blue-600 text-white font-bold py-1 px-3 rounded-full text-sm flex items-center gap-1 hover:bg-blue-700 transition-colors">
+                                <EditIcon className="w-4 h-4" />
+                                {t('edit')}
+                            </button>
                         </div>
                     ))}
                 </div>
             )}
+            {editingPoll && <EditPollModal poll={editingPoll} mode="update" onClose={() => setEditingPoll(null)} onSuccess={() => { fetchPolls(); setEditingPoll(null); }} />}
         </div>
     );
 };
@@ -240,17 +257,18 @@ const CompletedPollsPage: React.FC<{onBack: () => void}> = ({ onBack }) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [selectedPoll, setSelectedPoll] = useState<Poll | null>(null);
+    const [editingPoll, setEditingPoll] = useState<Poll | null>(null);
 
     const fetchPolls = useCallback(async () => {
         setLoading(true);
         setError(null);
         const now = new Date().toISOString();
-        const { data, error } = await supabase.from('polls').select('*').lt('end_date', now).order('end_date', {ascending: false});
+        const { data, error } = await supabase.from('polls').select('*, poll_options(*)').lt('end_date', now).order('end_date', {ascending: false});
         if (error) {
             setError(error.message);
             console.error(error);
         } else {
-            setPolls(data);
+            setPolls(data as Poll[]);
         }
         setLoading(false);
     }, []);
@@ -265,17 +283,24 @@ const CompletedPollsPage: React.FC<{onBack: () => void}> = ({ onBack }) => {
             {loading ? <p>{t('newsLoading')}</p> : error ? <p className="text-red-400">{t('newsError')}: {error}</p> : polls.length === 0 ? <p>{t('noCompletedPolls')}</p> : (
                 <div className="space-y-3">
                     {polls.map(poll => (
-                        <div key={poll.id} className="p-4 bg-marine-blue-darkest/50 rounded-md flex justify-between items-center">
+                        <div key={poll.id} className="p-4 bg-marine-blue-darkest/50 rounded-md flex justify-between items-center gap-2">
                             <div>
                                 <p className="font-bold">{poll.title}</p>
                                 <p className="text-xs text-white/50 mt-1">{t('pollEndedOn', {date: new Date(poll.end_date).toLocaleString()})}</p>
                             </div>
-                            <button onClick={() => setSelectedPoll(poll)} className="bg-golden-yellow text-marine-blue font-bold py-1 px-3 rounded-full text-sm">{t('viewResults')}</button>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                                <button onClick={() => setSelectedPoll(poll)} className="bg-golden-yellow text-marine-blue font-bold py-1 px-3 rounded-full text-sm">{t('viewResults')}</button>
+                                <button onClick={() => setEditingPoll(poll)} className="bg-blue-600 text-white font-bold py-1 px-3 rounded-full text-sm flex items-center gap-1 hover:bg-blue-700 transition-colors">
+                                    <EditIcon className="w-4 h-4" />
+                                    {t('edit')}
+                                </button>
+                            </div>
                         </div>
                     ))}
                 </div>
             )}
             {selectedPoll && <PollResultsModal poll={selectedPoll} onClose={() => setSelectedPoll(null)} onUpdate={fetchPolls} />}
+            {editingPoll && <EditPollModal poll={editingPoll} mode="republish" onClose={() => setEditingPoll(null)} onSuccess={() => { fetchPolls(); setEditingPoll(null); }} />}
         </div>
     );
 };
