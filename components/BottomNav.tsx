@@ -1,13 +1,11 @@
 import React from 'react';
 import { Page } from '../types';
-import { HomeIcon, NewsIcon, UploadIcon, PollIcon, UserIcon as ProfileIcon } from './Icons';
+import { HomeIcon, NewsIcon, UploadIcon, PollIcon, EventsIcon } from './Icons';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface BottomNavProps {
   activePage: Page;
   setActivePage: (page: Page) => void;
-  isLoggedIn: boolean;
-  markAnnouncementsAsSeen: () => void;
 }
 
 const NavItem: React.FC<{
@@ -30,19 +28,16 @@ const NavItem: React.FC<{
   );
 };
 
-const BottomNav: React.FC<BottomNavProps> = ({ activePage, setActivePage, isLoggedIn, markAnnouncementsAsSeen }) => {
+const BottomNav: React.FC<BottomNavProps> = ({ activePage, setActivePage }) => {
   const { t } = useLanguage();
   
-  const baseNavItems = [
+  const navItems = [
     { icon: HomeIcon, label: t('navHome'), page: Page.Home },
     { icon: NewsIcon, label: t('navNews'), page: Page.News },
     { icon: UploadIcon, label: t('navSocial'), page: Page.Upload },
     { icon: PollIcon, label: t('navPolls'), page: Page.Polls },
+    { icon: EventsIcon, label: t('navEvents'), page: Page.Events },
   ];
-  
-  const navItems = isLoggedIn
-    ? [...baseNavItems, { icon: ProfileIcon, label: t('profileNav'), page: Page.Profile }]
-    : baseNavItems;
 
   const newsPages = [Page.News, Page.Sport, Page.Weather];
 
@@ -60,9 +55,6 @@ const BottomNav: React.FC<BottomNavProps> = ({ activePage, setActivePage, isLogg
               : activePage === item.page
           }
           onClick={() => {
-            if (item.page === Page.Profile) {
-                markAnnouncementsAsSeen();
-            }
             setActivePage(item.page);
           }}
         />

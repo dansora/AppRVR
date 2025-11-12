@@ -13,16 +13,16 @@ import WeatherPage from './components/WeatherPage';
 import { useSettings } from './contexts/SettingsContext';
 import ScrollToTopButton from './components/ScrollToTopButton';
 import AuthModal from './components/AuthModal';
-import { UserIcon, FlagUkIcon, FlagRoIcon, SettingsIcon, AdminIcon } from './components/Icons';
+import { UserIcon, FlagUkIcon, FlagRoIcon, SettingsIcon, AdminIcon, LogoutIcon } from './components/Icons';
 import { useLanguage } from './contexts/LanguageContext';
 import TermsModal from './components/TermsModal';
 import StickyRadioPlayer from './components/StickyRadioPlayer';
 import { supabase } from './services/supabaseClient';
-import type { Session } from '@supabase/supabase-js';
 import ProfilePage from './components/ProfilePage';
 import { useProfile } from './contexts/ProfileContext';
 import AdminPage from './components/AdminPage';
 import { useModal } from './contexts/ModalContext';
+import EventsPage from './components/EventsPage';
 
 type ConsentStatus = 'pending' | 'accepted' | 'declined';
 
@@ -181,6 +181,8 @@ const App: React.FC = () => {
         return <SettingsPage onReviewTerms={() => setIsConsentModalOpen(true)} isLoggedIn={isLoggedIn} />;
       case Page.Profile:
         return <ProfilePage setActivePage={setActivePage} openAuthModal={() => setAuthModalOpen(true)} />;
+      case Page.Events:
+        return <EventsPage />;
       case Page.Admin:
         // Secure this page view
         return profile?.role === 'admin' ? <AdminPage /> : <HomePage setActivePage={setActivePage} isLoggedIn={isLoggedIn} openAuthModal={() => setAuthModalOpen(true)} />;
@@ -232,9 +234,16 @@ const App: React.FC = () => {
                     </button>
                     {isUserMenuOpen && (
                         <div className="absolute right-0 mt-2 w-48 bg-marine-blue-darker rounded-md shadow-lg py-1 z-50">
+                            <button
+                              onClick={() => { markAnnouncementsAsSeen(); setActivePage(Page.Profile); setUserMenuOpen(false); }}
+                              className="flex items-center gap-3 w-full text-left px-4 py-2 text-sm text-white hover:bg-marine-blue-darkest"
+                            >
+                              <UserIcon className="w-5 h-5" />
+                              {t('profileNav')}
+                            </button>
                             {profile?.role === 'admin' && (
                                 <button
-                                  onClick={() => { markAnnouncementsAsSeen(); setActivePage(Page.Admin); setUserMenuOpen(false); }}
+                                  onClick={() => { setActivePage(Page.Admin); setUserMenuOpen(false); }}
                                   className="flex items-center gap-3 w-full text-left px-4 py-2 text-sm text-white hover:bg-marine-blue-darkest"
                                 >
                                   <AdminIcon className="w-5 h-5" />
@@ -243,8 +252,9 @@ const App: React.FC = () => {
                             )}
                             <button
                               onClick={handleLogout}
-                              className="block w-full text-left px-4 py-2 text-sm text-white hover:bg-marine-blue-darkest"
+                              className="flex items-center gap-3 w-full text-left px-4 py-2 text-sm text-white hover:bg-marine-blue-darkest"
                             >
+                              <LogoutIcon className="w-5 h-5" />
                               {t('authLogout')}
                             </button>
                         </div>
@@ -261,7 +271,7 @@ const App: React.FC = () => {
                   <span className="hidden sm:inline">{t('navLogin')}</span>
                 </button>
               )}
-               <button onClick={() => { markAnnouncementsAsSeen(); setActivePage(Page.Settings); }} className="text-white">
+               <button onClick={() => { setActivePage(Page.Settings); }} className="text-white">
                   <SettingsIcon className="w-6 h-6" />
                </button>
             </div>
@@ -276,7 +286,7 @@ const App: React.FC = () => {
         <ScrollToTopButton />
 
         {!isModalOpen && consentStatus === 'accepted' && activePage !== Page.Radio && <StickyRadioPlayer setActivePage={setActivePage} />}
-        {consentStatus === 'accepted' && <BottomNav activePage={activePage} setActivePage={setActivePage} isLoggedIn={!!session} markAnnouncementsAsSeen={markAnnouncementsAsSeen} />}
+        {consentStatus === 'accepted' && <BottomNav activePage={activePage} setActivePage={setActivePage} />}
         
         {isAuthModalOpen && <AuthModal onClose={() => setAuthModalOpen(false)} />}
         

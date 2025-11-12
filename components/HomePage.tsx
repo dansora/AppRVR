@@ -51,7 +51,6 @@ const HomePage: React.FC<HomePageProps> = ({ setActivePage, isLoggedIn, openAuth
   }, []);
 
   const urls = {
-    events: "https://radiovocearomanilor.com/wp/informatii-utile/evenimente-rvr/",
     usefulInfo: "https://radiovocearomanilor.com/wp/informatii-utile/",
     advertising: "https://radiovocearomanilor.com/wp/informatii-utile/publicitate-rvr/",
     store: "https://radio-vocea-romanilor-1.sumupstore.com/"
@@ -61,7 +60,7 @@ const HomePage: React.FC<HomePageProps> = ({ setActivePage, isLoggedIn, openAuth
     { key: Page.News, icon: NewsIcon, title: t('navNews'), action: () => setActivePage(Page.News) },
     { key: Page.Sport, icon: SportIcon, title: t('navSport'), action: () => setActivePage(Page.Sport) },
     { key: Page.Weather, icon: WeatherIcon, title: t('homeWeatherTitle'), action: () => setActivePage(Page.Weather) },
-    { key: Page.Events, icon: EventsIcon, title: t('navEvents'), action: () => setRedirectInfo({ title: t('navEvents'), url: urls.events }) },
+    { key: Page.Events, icon: EventsIcon, title: t('navEvents'), action: () => setActivePage(Page.Events) },
     { key: Page.UsefulInfo, icon: InfoIcon, title: t('navUsefulInfo'), action: () => setRedirectInfo({ title: t('navUsefulInfo'), url: urls.usefulInfo }) },
     { key: Page.Advertising, icon: AdvertisingIcon, title: t('navAdvertising'), action: () => setRedirectInfo({ title: t('navAdvertising'), url: urls.advertising }) },
   ];
