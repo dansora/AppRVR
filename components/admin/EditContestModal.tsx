@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabaseClient';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { CloseIcon, UploadIcon } from '../Icons';
+import { useModal } from '../../contexts/ModalContext';
 
 interface Contest {
   id: number;
@@ -27,6 +28,12 @@ const EditContestModal: React.FC<EditContestModalProps> = ({ contest, onClose, o
   const { t } = useLanguage();
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  const { registerModal, unregisterModal } = useModal();
+
+  useEffect(() => {
+    registerModal();
+    return () => unregisterModal();
+  }, [registerModal, unregisterModal]);
 
   const [title, setTitle] = useState(contest.title);
   const [description, setDescription] = useState(contest.description || '');

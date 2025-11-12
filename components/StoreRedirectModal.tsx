@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { CloseIcon, StoreIcon } from './Icons';
+import { useModal } from '../contexts/ModalContext';
 
 interface StoreRedirectModalProps {
   onClose: () => void;
@@ -10,6 +11,12 @@ const STORE_URL = "https://radio-vocea-romanilor-1.sumupstore.com/";
 
 const StoreRedirectModal: React.FC<StoreRedirectModalProps> = ({ onClose }) => {
   const { t } = useLanguage();
+  const { registerModal, unregisterModal } = useModal();
+
+  useEffect(() => {
+    registerModal();
+    return () => unregisterModal();
+  }, [registerModal, unregisterModal]);
 
   const handleAccept = () => {
     window.open(STORE_URL, '_blank');

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { supabase } from '../../services/supabaseClient';
 import { BarChartIcon, CloseIcon } from '../Icons';
+import { useModal } from '../../contexts/ModalContext';
 
 interface Poll {
     id: number;
@@ -34,6 +35,12 @@ const PollResultsModal: React.FC<PollResultsModalProps> = ({ poll, onClose, onUp
     const [loading, setLoading] = useState(true);
     const [isPublished, setIsPublished] = useState(poll.is_published);
     const [message, setMessage] = useState<{type:'success'|'error', text:string}|null>(null);
+    const { registerModal, unregisterModal } = useModal();
+
+    useEffect(() => {
+        registerModal();
+        return () => unregisterModal();
+    }, [registerModal, unregisterModal]);
 
     const fetchResults = useCallback(async () => {
         setLoading(true);

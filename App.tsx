@@ -22,6 +22,7 @@ import type { Session } from '@supabase/supabase-js';
 import ProfilePage from './components/ProfilePage';
 import { useProfile } from './contexts/ProfileContext';
 import AdminPage from './components/AdminPage';
+import { useModal } from './contexts/ModalContext';
 
 type ConsentStatus = 'pending' | 'accepted' | 'declined';
 
@@ -36,6 +37,7 @@ const App: React.FC = () => {
   const [isAuthModalOpen, setAuthModalOpen] = useState(false);
   const { t, language, setLanguage } = useLanguage();
   const { session, profile, loadingProfile } = useProfile();
+  const { isModalOpen } = useModal();
 
   const [consentStatus, setConsentStatus] = useState<ConsentStatus>('pending');
   const [isConsentModalOpen, setIsConsentModalOpen] = useState(false);
@@ -273,7 +275,7 @@ const App: React.FC = () => {
 
         <ScrollToTopButton />
 
-        {consentStatus === 'accepted' && activePage !== Page.Radio && <StickyRadioPlayer setActivePage={setActivePage} />}
+        {!isModalOpen && consentStatus === 'accepted' && activePage !== Page.Radio && <StickyRadioPlayer setActivePage={setActivePage} />}
         {consentStatus === 'accepted' && <BottomNav activePage={activePage} setActivePage={setActivePage} isLoggedIn={!!session} markAnnouncementsAsSeen={markAnnouncementsAsSeen} />}
         
         {isAuthModalOpen && <AuthModal onClose={() => setAuthModalOpen(false)} />}

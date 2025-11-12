@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { CloseIcon } from './Icons';
+import { useModal } from '../contexts/ModalContext';
 
 interface ContactModalProps {
   onClose: () => void;
@@ -14,6 +15,12 @@ const ContactModal: React.FC<ContactModalProps> = ({ onClose }) => {
     email: '',
     message: '',
   });
+  const { registerModal, unregisterModal } = useModal();
+
+  useEffect(() => {
+    registerModal();
+    return () => unregisterModal();
+  }, [registerModal, unregisterModal]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;

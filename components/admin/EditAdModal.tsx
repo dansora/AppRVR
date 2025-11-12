@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabaseClient';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { CloseIcon } from '../Icons';
+import { useModal } from '../../contexts/ModalContext';
 
 interface Advertisement {
   id: number;
@@ -26,6 +27,12 @@ const EditAdModal: React.FC<EditAdModalProps> = ({ ad, onClose, onSuccess }) => 
   const { t } = useLanguage();
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  const { registerModal, unregisterModal } = useModal();
+
+  useEffect(() => {
+    registerModal();
+    return () => unregisterModal();
+  }, [registerModal, unregisterModal]);
 
   const [title, setTitle] = useState(ad.title);
   const [text, setText] = useState(ad.text || '');

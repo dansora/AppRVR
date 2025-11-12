@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { useLanguage } from '../contexts/LanguageContext';
 import { CloseIcon } from './Icons';
+import { useModal } from '../contexts/ModalContext';
 
 interface Announcement {
   id: number;
@@ -20,6 +21,12 @@ const ResendAnnouncementModal: React.FC<ResendAnnouncementModalProps> = ({ annou
   const { t } = useLanguage();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { registerModal, unregisterModal } = useModal();
+
+  useEffect(() => {
+    registerModal();
+    return () => unregisterModal();
+  }, [registerModal, unregisterModal]);
 
   // Form state, initialized from the announcement prop
   const [title, setTitle] = useState('');

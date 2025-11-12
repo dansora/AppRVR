@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { CloseIcon, DonateIcon } from './Icons';
+import { useModal } from '../contexts/ModalContext';
 
 interface DonationModalProps {
   onClose: () => void;
@@ -10,6 +11,12 @@ const DONATION_URL = "https://radio-vocea-romanilor-1.sumupstore.com/category/do
 
 const DonationModal: React.FC<DonationModalProps> = ({ onClose }) => {
   const { t } = useLanguage();
+  const { registerModal, unregisterModal } = useModal();
+
+  useEffect(() => {
+    registerModal();
+    return () => unregisterModal();
+  }, [registerModal, unregisterModal]);
 
   return (
     <div 

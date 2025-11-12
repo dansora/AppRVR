@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { CloseIcon } from './Icons';
+import { useModal } from '../contexts/ModalContext';
 
 interface TermsModalProps {
     mode: 'consent' | 'view';
@@ -11,6 +12,12 @@ interface TermsModalProps {
 
 const TermsModal: React.FC<TermsModalProps> = ({ mode, onClose, onAccept, onDecline }) => {
   const { t } = useLanguage();
+  const { registerModal, unregisterModal } = useModal();
+
+  useEffect(() => {
+    registerModal();
+    return () => unregisterModal();
+  }, [registerModal, unregisterModal]);
 
   return (
     <div 

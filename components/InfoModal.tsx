@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { CloseIcon } from './Icons';
+import { useModal } from '../contexts/ModalContext';
 
 interface InfoModalProps {
   onClose: () => void;
@@ -11,6 +12,12 @@ interface InfoModalProps {
 const InfoModal: React.FC<InfoModalProps> = ({ onClose, title, url }) => {
   const { t } = useLanguage();
   const [isLoading, setIsLoading] = useState(true);
+  const { registerModal, unregisterModal } = useModal();
+
+  useEffect(() => {
+    registerModal();
+    return () => unregisterModal();
+  }, [registerModal, unregisterModal]);
 
   return (
     <div 

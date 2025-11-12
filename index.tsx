@@ -5,6 +5,7 @@ import { LanguageProvider } from './contexts/LanguageContext';
 import { SettingsProvider } from './contexts/SettingsContext';
 import { AudioProvider } from './contexts/AudioContext';
 import { ProfileProvider } from './contexts/ProfileContext';
+import { ModalProvider } from './contexts/ModalContext';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -18,7 +19,9 @@ root.render(
       <SettingsProvider>
         <AudioProvider>
           <ProfileProvider>
-            <App />
+            <ModalProvider>
+              <App />
+            </ModalProvider>
           </ProfileProvider>
         </AudioProvider>
       </SettingsProvider>

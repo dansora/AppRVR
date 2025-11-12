@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { CloseIcon, UserIcon, GitHubIcon, GoogleIcon, FacebookIcon, AppleIcon } from './Icons';
 import { supabase } from '../services/supabaseClient';
 import type { Provider } from '@supabase/supabase-js';
+import { useModal } from '../contexts/ModalContext';
 
 interface AuthModalProps {
   onClose: () => void;
@@ -16,6 +17,12 @@ const AuthModal: React.FC<AuthModalProps> = ({ onClose }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const { registerModal, unregisterModal } = useModal();
+
+  useEffect(() => {
+    registerModal();
+    return () => unregisterModal();
+  }, [registerModal, unregisterModal]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
