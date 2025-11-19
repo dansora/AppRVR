@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../services/supabaseClient';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { BackIcon, UserIcon, EditIcon, CheckCircleIcon } from '../Icons';
+import { BackIcon, UserIcon, EditIcon, CheckCircleIcon, DatabaseIcon, CloseIcon } from '../Icons';
 
 interface UserProfile {
   id: string;
@@ -26,6 +26,7 @@ const UsersManager: React.FC<UsersManagerProps> = ({ onBack }) => {
   const [updateError, setUpdateError] = useState<{message: string, sql?: string, title?: string} | null>(null);
   const [editingUser, setEditingUser] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  const [showSqlHelp, setShowSqlHelp] = useState(false);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -108,12 +109,19 @@ USING ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin'::text)
       setUpdateError(null);
       
       try {
-        const { error } = await supabase
+        // We use select() to ensure we get data back. If RLS blocks it, data might be empty or null.
+        const { data, error } = await supabase
             .from('profiles')
             .update({ role: newRole })
-            .eq('id', userId);
+            .eq('id', userId)
+            .select();
 
         if (error) throw error;
+
+        // Check for Silent RLS Failure
+        if (!data || data.length === 0) {
+             throw new Error("RLS_BLOCK");
+        }
 
         setMessage({ type: 'success', text: t('userRoleUpdatedSuccess') });
         setEditingUser(null);
@@ -121,20 +129,31 @@ USING ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin'::text)
 
       } catch (err: any) {
           console.error("Update Role Error:", err);
-          if (err.code === '42501' || err.message.includes('violates row-level security')) {
-             const sql = `CREATE POLICY "Allow admins to update all profiles"
+          
+          const sql = `-- POLICY: Allow admins to update any profile
+-- 1. Drop existing policy if it conflicts (optional, be careful)
+DROP POLICY IF EXISTS "Allow admins to update all profiles" ON public.profiles;
+
+-- 2. Create the UPDATE policy
+CREATE POLICY "Allow admins to update all profiles"
 ON public.profiles
 FOR UPDATE
 TO authenticated
-USING ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin'::text)
-WITH CHECK ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin'::text);`;
-            
+USING (
+  (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin'::text
+)
+WITH CHECK (
+  (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin'::text
+);`;
+
+          if (err.message === "RLS_BLOCK" || err.code === '42501' || err.message.includes('violates row-level security')) {
             setUpdateError({
                 title: "Permission Denied (Update)",
-                message: "You don't have permission to update user roles. Please run this SQL:",
+                message: "The database blocked this update. This usually means the 'UPDATE' policy is missing for admins.",
                 sql: sql
             });
-            setMessage({ type: 'error', text: t('userRoleUpdatedError') });
+            // Force show the help section
+            setShowSqlHelp(true);
           } else {
             setMessage({ type: 'error', text: `${t('userRoleUpdatedError')}: ${err.message}` });
           }
@@ -161,10 +180,56 @@ WITH CHECK ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin'::
 
   return (
     <div className="space-y-6">
-        <button onClick={onBack} className="flex items-center gap-2 text-golden-yellow hover:underline mb-4">
-            <BackIcon className="w-5 h-5" />
-            {t('backToDashboard')}
-        </button>
+        <div className="flex justify-between items-center">
+            <button onClick={onBack} className="flex items-center gap-2 text-golden-yellow hover:underline">
+                <BackIcon className="w-5 h-5" />
+                {t('backToDashboard')}
+            </button>
+            <button 
+                onClick={() => setShowSqlHelp(!showSqlHelp)} 
+                className="flex items-center gap-2 bg-blue-600 text-white px-3 py-2 rounded-md text-sm hover:bg-blue-700 transition-colors"
+            >
+                <DatabaseIcon className="w-4 h-4" />
+                {showSqlHelp ? "Hide SQL Helpers" : "Show SQL Helpers"}
+            </button>
+        </div>
+
+        {showSqlHelp && (
+            <div className="bg-marine-blue-darkest border border-blue-500 p-4 rounded-lg relative animate-fade-in">
+                 <button onClick={() => setShowSqlHelp(false)} className="absolute top-2 right-2 text-white/50 hover:text-white"><CloseIcon className="w-5 h-5"/></button>
+                 <h3 className="text-lg font-bold text-blue-300 mb-4">Database Setup Scripts</h3>
+                 
+                 <div className="space-y-6">
+                    <div>
+                        <p className="text-sm text-white/80 mb-2 font-bold">1. Fix Permissions (Allow Admins to Update Roles)</p>
+                        <pre className="bg-black/50 p-3 rounded text-xs text-green-300 overflow-x-auto font-mono select-all">
+{`-- Run this to allow admins to change user roles
+CREATE POLICY "Allow admins to update all profiles"
+ON public.profiles
+FOR UPDATE
+TO authenticated
+USING (
+  (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin'::text
+)
+WITH CHECK (
+  (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin'::text
+);`}
+                        </pre>
+                    </div>
+
+                    <div>
+                         <p className="text-sm text-white/80 mb-2 font-bold">2. Fix Permissions (Allow Admins to View Users)</p>
+                         <pre className="bg-black/50 p-3 rounded text-xs text-green-300 overflow-x-auto font-mono select-all">
+{`CREATE POLICY "Allow admins to view all profiles"
+ON public.profiles
+FOR SELECT
+TO authenticated
+USING ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin'::text);`}
+                        </pre>
+                    </div>
+                 </div>
+            </div>
+        )}
 
         {message && (
              <div className={`p-3 rounded-md text-center mb-4 flex items-center justify-center gap-2 ${message.type === 'success' ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'}`}>
@@ -180,7 +245,7 @@ WITH CHECK ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin'::
                 <p className="text-white/90">{fetchError.message}</p>
                 {fetchError.sql && (
                     <div className="relative">
-                        <pre className="bg-marine-blue-darkest p-4 rounded-md text-xs text-green-300 overflow-x-auto font-mono border border-white/10">
+                        <pre className="bg-marine-blue-darkest p-4 rounded-md text-xs text-green-300 overflow-x-auto font-mono border border-white/10 select-all">
                             <code>{fetchError.sql}</code>
                         </pre>
                         <p className="text-xs text-white/50 mt-2">Run this in Supabase SQL Editor.</p>
@@ -196,7 +261,7 @@ WITH CHECK ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin'::
                 <p className="text-white/90">{updateError.message}</p>
                 {updateError.sql && (
                     <div className="relative">
-                        <pre className="bg-black/30 p-4 rounded-md text-xs text-green-300 overflow-x-auto font-mono border border-white/10">
+                        <pre className="bg-black/30 p-4 rounded-md text-xs text-green-300 overflow-x-auto font-mono border border-white/10 select-all">
                             <code>{updateError.sql}</code>
                         </pre>
                         <p className="text-xs text-white/50 mt-2">Run this in Supabase SQL Editor.</p>
