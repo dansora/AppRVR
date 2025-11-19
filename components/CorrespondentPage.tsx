@@ -49,11 +49,24 @@ const CorrespondentPage: React.FC = () => {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
     }
+    if (mediaRecorderRef.current) {
+      if (mediaRecorderRef.current.state === 'recording') {
+        mediaRecorderRef.current.stop();
+      }
+      mediaRecorderRef.current = null;
+    }
   };
 
   const startRecording = async () => {
     setMessage(null);
     cleanupStream(); // Force cleanup of any previous streams
+
+    // Check for Secure Context (HTTPS or localhost)
+    if (!window.isSecureContext) {
+        setMessage({ type: 'error', text: t('secureContextRequired') });
+        return;
+    }
+
     try {
       // Check API support
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -63,7 +76,9 @@ const CorrespondentPage: React.FC = () => {
       // Simplified constraints to reduce compatibility issues
       const constraints = {
         audio: true,
-        video: mediaType === 'video' ? { facingMode: "user" } : false
+        // Using boolean true for video maximizes compatibility. 
+        // Requesting specific 'facingMode' can sometimes cause issues on desktop or older devices.
+        video: mediaType === 'video' ? true : false
       };
       
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -75,8 +90,6 @@ const CorrespondentPage: React.FC = () => {
 
       // Determine supported mime type
       let options;
-      // Try to find a supported mime type if we want to be specific, 
-      // otherwise let the browser pick the default for the stream.
       if (mediaType === 'video') {
            if (MediaRecorder.isTypeSupported('video/mp4')) options = { mimeType: 'video/mp4' };
            else if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) options = { mimeType: 'video/webm;codecs=vp9' };
@@ -121,18 +134,16 @@ const CorrespondentPage: React.FC = () => {
       const errorName = err.name || 'UnknownError';
       const errorMsg = (err.message || '').toLowerCase();
 
-      if (errorName === 'NotAllowedError' || errorName === 'PermissionDeniedError' || errorMsg.includes('denied') || errorMsg.includes('permission')) {
+      if (errorName === 'NotAllowedError' || errorName === 'PermissionDeniedError' || errorMsg.includes('denied') || errorMsg.includes('permission') || errorMsg.includes('system')) {
           errorMessage = t('micCameraPermissionDenied');
       } else if (errorName === 'NotFoundError' || errorName === 'DevicesNotFoundError') {
           errorMessage = t('micCameraNotFound');
       } else if (errorName === 'NotReadableError' || errorName === 'TrackStartError') {
           errorMessage = t('micCameraInUse');
-      } else if (errorMsg.includes('system')) {
-           // Fallback for specific system message if not caught above
-           errorMessage = t('micCameraPermissionDenied');
       }
       
       setMessage({ type: 'error', text: errorMessage });
+      cleanupStream(); // Ensure cleanup on error
     }
   };
 
@@ -205,21 +216,15 @@ const CorrespondentPage: React.FC = () => {
             .getPublicUrl(fileName);
 
           // 2. Insert Record into Database
-          // Mapping to user's specific table structure:
-          // user_name, email, date_time, audio, video, title, message
-          
           const insertPayload = {
               title: title,
-              message: description, // Maps to 'message'
-              user_name: profile?.first_name ? `${profile.first_name} ${profile.last_name}` : (profile?.username || 'N/A'), // Maps to 'user_name'
+              message: description, 
+              user_name: profile?.first_name ? `${profile.first_name} ${profile.last_name}` : (profile?.username || 'N/A'),
               email: session.user.email,
-              date_time: new Date().toISOString(), // Maps to 'date_time'
+              date_time: new Date().toISOString(),
               // Conditional columns based on media type
               audio: mediaType === 'audio' ? publicUrlData.publicUrl : null,
               video: mediaType === 'video' ? publicUrlData.publicUrl : null,
-              // Important: We should try to insert user_id if the column exists, 
-              // otherwise RLS is hard. The prompt didn't list user_id, but I'll try to send it
-              // or the SQL fix will add it.
               user_id: session.user.id 
           };
 
