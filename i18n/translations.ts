@@ -403,7 +403,7 @@ Thank you for your support!`,
     recordingInProgress: "Recording in progress...",
     correspondentDbError: "Database not configured for correspondent materials.",
     
-    micCameraPermissionDenied: "Access denied. Please enable microphone/camera permissions in your browser settings.",
+    micCameraPermissionDenied: "Access denied. Please check your Browser Permissions AND System Settings (Privacy > Microphone/Camera).",
     micCameraNotFound: "No microphone or camera detected.",
     micCameraInUse: "Device is in use by another application or not readable.",
     micCameraErrorGeneric: "Error accessing media devices.",
@@ -499,7 +499,7 @@ Thank you for your support!`,
     authSignInWithFacebook: 'Autentificare cu Facebook',
     authSignInWithApple: 'Autentificare cu Apple',
     termsTitle: 'Termeni și Condiții',
-    termsContentPlaceholder: `1. Acceptarea Termenilor
+    termsContentPlaceholder: `1. Acceptance of Terms
 Prin accesarea și utilizarea aplicației Radio Vocea Românilor ("RVR") ("Aplicația"), sunteți de acord să respectați acești Termeni și Condiții ("Termeni"). Dacă nu sunteți de acord cu orice parte a acestor termeni, nu puteți utiliza Aplicația în deplinătatea funcționalităților sale. Refusal de a accepta acești termeni va limita accesul dvs. doar la funcționalitatea de streaming radio.
 
 2. Descrierea Serviciului
@@ -810,7 +810,7 @@ Vă mulțumim pentru sprijinul acordat!`,
     recordingInProgress: "Înregistrare în curs...",
     correspondentDbError: "Baza de date nu este configurată pentru corespondenți.",
 
-    micCameraPermissionDenied: "Acces refuzat. Vă rugăm să activați permisiunile pentru microfon/cameră din setările browserului.",
+    micCameraPermissionDenied: "Acces refuzat. Vă rugăm verificați permisiunile Browserului ȘI Setările de Sistem (Confidențialitate > Microfon/Cameră).",
     micCameraNotFound: "Nu a fost detectat niciun microfon sau cameră.",
     micCameraInUse: "Dispozitivul este utilizat de o altă aplicație sau nu poate fi citit.",
     micCameraErrorGeneric: "Eroare la accesarea dispozitivelor media.",
