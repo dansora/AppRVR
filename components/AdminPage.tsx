@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import AdminDashboard from './admin/AdminDashboard';
@@ -8,10 +9,11 @@ import AdvertisingManager from './admin/AdvertisingManager';
 import ContestsManager from './admin/ContestsManager';
 import EventsManager from './admin/EventsManager';
 import UsersManager from './admin/UsersManager';
+import CorrespondentSubmissionsManager from './admin/CorrespondentSubmissionsManager';
 
 const AdminPage: React.FC = () => {
   const { t } = useLanguage();
-  const [view, setView] = useState<'dashboard' | 'announcements' | 'polls' | 'submissions' | 'advertising' | 'contests' | 'events' | 'users'>('dashboard');
+  const [view, setView] = useState<'dashboard' | 'announcements' | 'polls' | 'submissions' | 'advertising' | 'contests' | 'events' | 'users' | 'correspondent-submissions'>('dashboard');
 
   const getTitle = () => {
     switch (view) {
@@ -29,6 +31,8 @@ const AdminPage: React.FC = () => {
         return t('adminEventsPageTitle');
       case 'users':
         return t('adminUsersPageTitle');
+      case 'correspondent-submissions':
+        return t('adminCorrespondentManagerPageTitle');
       case 'dashboard':
       default:
         return t('adminPanelTitle');
@@ -51,6 +55,8 @@ const AdminPage: React.FC = () => {
         return <EventsManager onBack={() => setView('dashboard')} />;
       case 'users':
         return <UsersManager onBack={() => setView('dashboard')} />;
+      case 'correspondent-submissions':
+        return <CorrespondentSubmissionsManager onBack={() => setView('dashboard')} />;
       case 'dashboard':
       default:
         return <AdminDashboard setView={setView} />;
