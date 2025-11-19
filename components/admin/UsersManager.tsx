@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../services/supabaseClient';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { BackIcon, UserIcon, EditIcon } from '../Icons';
+import { BackIcon, UserIcon, EditIcon, CheckCircleIcon } from '../Icons';
 
 interface UserProfile {
   id: string;
@@ -21,16 +22,16 @@ const UsersManager: React.FC<UsersManagerProps> = ({ onBack }) => {
   const { t } = useLanguage();
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<{message: string, sql?: string, title?: string} | null>(null);
+  const [fetchError, setFetchError] = useState<{message: string, sql?: string, title?: string} | null>(null);
+  const [updateError, setUpdateError] = useState<{message: string, sql?: string, title?: string} | null>(null);
   const [editingUser, setEditingUser] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
-    setError(null);
+    setFetchError(null);
 
     try {
-        // Try to fetch with all desired columns
         let { data, error } = await supabase
         .from('profiles')
         .select('id, username, first_name, last_name, email, role, created_at')
@@ -44,14 +45,12 @@ const UsersManager: React.FC<UsersManagerProps> = ({ onBack }) => {
     } catch (err: any) {
         console.error("Fetch Users Error:", err);
 
-        // Handle "column does not exist" error (code 42703)
         if (err.code === '42703') {
-            const fixSql = `-- 1. Add missing columns to profiles table
+            const fixSql = `-- Add missing columns and backfill data
 ALTER TABLE public.profiles 
 ADD COLUMN IF NOT EXISTS created_at timestamp with time zone DEFAULT now(),
 ADD COLUMN IF NOT EXISTS email text;
 
--- 2. Backfill data from auth.users for existing users
 UPDATE public.profiles
 SET 
   created_at = auth.users.created_at,
@@ -59,7 +58,6 @@ SET
 FROM auth.users
 WHERE public.profiles.id = auth.users.id;
 
--- 3. Update the trigger to automatically save email and created_at for NEW users
 CREATE OR REPLACE FUNCTION public.handle_new_user() 
 RETURNS trigger AS $$
 BEGIN
@@ -75,27 +73,26 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;`;
 
-            setError({ 
+            setFetchError({ 
                 title: "Database Update Required",
-                message: "The 'profiles' table is missing the 'created_at' or 'email' columns. Please run this SQL script to fix the schema and sync existing user data:",
+                message: "Missing columns in 'profiles' table.",
                 sql: fixSql 
             });
         } 
-        // Handle Permission Denied (RLS) - code 42501
         else if (err.code === '42501') {
              const sql = `CREATE POLICY "Allow admins to view all profiles"
 ON public.profiles
 FOR SELECT
 TO authenticated
 USING ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin'::text);`;
-             setError({ 
-                 title: t('dbErrorUsers'), 
-                 message: t('dbErrorUsersInstruction'),
+             setFetchError({ 
+                 title: "Permission Denied (Select)", 
+                 message: "Admins cannot view the user list.",
                  sql: sql 
             });
         } 
         else {
-            setError({ message: err.message || "An unexpected error occurred." });
+            setFetchError({ message: err.message || "An unexpected error occurred." });
         }
     } finally {
         setLoading(false);
@@ -108,18 +105,39 @@ USING ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin'::text)
 
   const handleRoleChange = async (userId: string, newRole: string) => {
       setMessage(null);
-      const { error } = await supabase
-        .from('profiles')
-        .update({ role: newRole })
-        .eq('id', userId);
+      setUpdateError(null);
+      
+      try {
+        const { error } = await supabase
+            .from('profiles')
+            .update({ role: newRole })
+            .eq('id', userId);
 
-      if (error) {
-          setMessage({ type: 'error', text: `${t('userRoleUpdatedError')}: ${error.message}` });
-      } else {
-          setMessage({ type: 'success', text: t('userRoleUpdatedSuccess') });
-          setEditingUser(null);
-          // Optimistic update
-          setUsers(users.map(u => u.id === userId ? { ...u, role: newRole as any } : u));
+        if (error) throw error;
+
+        setMessage({ type: 'success', text: t('userRoleUpdatedSuccess') });
+        setEditingUser(null);
+        setUsers(users.map(u => u.id === userId ? { ...u, role: newRole as any } : u));
+
+      } catch (err: any) {
+          console.error("Update Role Error:", err);
+          if (err.code === '42501' || err.message.includes('violates row-level security')) {
+             const sql = `CREATE POLICY "Allow admins to update all profiles"
+ON public.profiles
+FOR UPDATE
+TO authenticated
+USING ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin'::text)
+WITH CHECK ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin'::text);`;
+            
+            setUpdateError({
+                title: "Permission Denied (Update)",
+                message: "You don't have permission to update user roles. Please run this SQL:",
+                sql: sql
+            });
+            setMessage({ type: 'error', text: t('userRoleUpdatedError') });
+          } else {
+            setMessage({ type: 'error', text: `${t('userRoleUpdatedError')}: ${err.message}` });
+          }
       }
   };
 
@@ -149,28 +167,45 @@ USING ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin'::text)
         </button>
 
         {message && (
-             <div className={`p-3 rounded-md text-center mb-4 ${message.type === 'success' ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'}`}>
+             <div className={`p-3 rounded-md text-center mb-4 flex items-center justify-center gap-2 ${message.type === 'success' ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'}`}>
+                {message.type === 'success' && <CheckCircleIcon className="w-5 h-5" />}
                 {message.text}
              </div>
         )}
 
-        {/* Error handling with SQL instructions */}
-        {error && (
-            <div className="bg-marine-blue-darker border-l-4 border-golden-yellow p-6 rounded-lg space-y-4 shadow-lg">
-                <h3 className="text-xl font-bold text-golden-yellow">{error.title || "Error"}</h3>
-                <p className="text-white/90">{error.message}</p>
-                {error.sql && (
+        {/* Fetch Error Handling */}
+        {fetchError && (
+            <div className="bg-marine-blue-darker border-l-4 border-golden-yellow p-6 rounded-lg space-y-4 shadow-lg mb-6">
+                <h3 className="text-xl font-bold text-golden-yellow">{fetchError.title || "Error"}</h3>
+                <p className="text-white/90">{fetchError.message}</p>
+                {fetchError.sql && (
                     <div className="relative">
                         <pre className="bg-marine-blue-darkest p-4 rounded-md text-xs text-green-300 overflow-x-auto font-mono border border-white/10">
-                            <code>{error.sql}</code>
+                            <code>{fetchError.sql}</code>
                         </pre>
-                        <p className="text-xs text-white/50 mt-2">Copy and run this in your Supabase SQL Editor.</p>
+                        <p className="text-xs text-white/50 mt-2">Run this in Supabase SQL Editor.</p>
                     </div>
                 )}
             </div>
         )}
 
-        {!error && (
+        {/* Update Error Handling */}
+        {updateError && (
+            <div className="bg-red-900/50 border-l-4 border-red-500 p-6 rounded-lg space-y-4 shadow-lg mb-6">
+                <h3 className="text-xl font-bold text-red-300">{updateError.title || "Update Error"}</h3>
+                <p className="text-white/90">{updateError.message}</p>
+                {updateError.sql && (
+                    <div className="relative">
+                        <pre className="bg-black/30 p-4 rounded-md text-xs text-green-300 overflow-x-auto font-mono border border-white/10">
+                            <code>{updateError.sql}</code>
+                        </pre>
+                        <p className="text-xs text-white/50 mt-2">Run this in Supabase SQL Editor.</p>
+                    </div>
+                )}
+            </div>
+        )}
+
+        {!fetchError && (
             <div className="bg-marine-blue-darker p-6 rounded-lg shadow-md">
                 <h2 className="text-xl font-montserrat mb-4 text-golden-yellow">{t('adminUsersPageTitle')}</h2>
                 {loading ? <p>{t('newsLoading')}</p> : users.length === 0 ? <p>No users found.</p> : (
@@ -200,19 +235,19 @@ USING ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin'::text)
                                 </div>
 
                                 {editingUser === user.id ? (
-                                    <div className="mt-auto space-y-2 bg-marine-blue-darker p-2 rounded-md">
+                                    <div className="mt-auto space-y-2 bg-marine-blue-darker p-2 rounded-md animate-fade-in">
                                         <label className="text-xs text-white/70 uppercase">{t('updateRole')}</label>
                                         <select 
                                             defaultValue={user.role || 'user'} 
                                             onChange={(e) => handleRoleChange(user.id, e.target.value)}
-                                            className="w-full bg-marine-blue-darkest text-white p-2 rounded-md text-sm focus:ring-1 focus:ring-golden-yellow outline-none"
+                                            className="w-full bg-marine-blue-darkest text-white p-2 rounded-md text-sm focus:ring-1 focus:ring-golden-yellow outline-none border border-white/20"
                                         >
                                             <option value="user">{t('roleUser')}</option>
                                             <option value="correspondent">{t('roleCorrespondent')}</option>
                                             <option value="special-user">{t('roleSpecialUser')}</option>
                                             <option value="admin">{t('roleAdmin')}</option>
                                         </select>
-                                        <button onClick={() => setEditingUser(null)} className="w-full text-xs text-white/50 hover:text-white mt-1 underline">Cancel</button>
+                                        <button onClick={() => { setEditingUser(null); setUpdateError(null); }} className="w-full text-xs text-white/50 hover:text-white mt-1 underline">Cancel</button>
                                     </div>
                                 ) : (
                                     <div className="mt-auto pt-2 border-t border-white/10">
