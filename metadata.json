@@ -1,5 +1,8 @@
 {
   "name": "RVR App",
   "description": "A Progressive Web App (PWA) for an online radio station, offering live streaming, news, user content uploads, and interactive polls.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
 }
