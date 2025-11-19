@@ -13,4 +13,5 @@ export enum Page {
   UsefulInfo = 'UsefulInfo',
   Advertising = 'Advertising',
   Admin = 'Admin',
+  Correspondent = 'Correspondent',
 }

@@ -13,7 +13,7 @@ import WeatherPage from './components/WeatherPage';
 import { useSettings } from './contexts/SettingsContext';
 import ScrollToTopButton from './components/ScrollToTopButton';
 import AuthModal from './components/AuthModal';
-import { UserIcon, FlagUkIcon, FlagRoIcon, SettingsIcon, AdminIcon, LogoutIcon } from './components/Icons';
+import { UserIcon, FlagUkIcon, FlagRoIcon, SettingsIcon, AdminIcon, LogoutIcon, MicIcon } from './components/Icons';
 import { useLanguage } from './contexts/LanguageContext';
 import TermsModal from './components/TermsModal';
 import StickyRadioPlayer from './components/StickyRadioPlayer';
@@ -23,6 +23,7 @@ import { useProfile } from './contexts/ProfileContext';
 import AdminPage from './components/AdminPage';
 import { useModal } from './contexts/ModalContext';
 import EventsPage from './components/EventsPage';
+import CorrespondentPage from './components/CorrespondentPage';
 
 type ConsentStatus = 'pending' | 'accepted' | 'declined';
 
@@ -186,6 +187,8 @@ const App: React.FC = () => {
       case Page.Admin:
         // Secure this page view
         return profile?.role === 'admin' ? <AdminPage /> : <HomePage setActivePage={setActivePage} isLoggedIn={isLoggedIn} openAuthModal={() => setAuthModalOpen(true)} />;
+      case Page.Correspondent:
+        return (profile?.role === 'correspondent' || profile?.role === 'admin') ? <CorrespondentPage /> : <HomePage setActivePage={setActivePage} isLoggedIn={isLoggedIn} openAuthModal={() => setAuthModalOpen(true)} />;
       default:
         return <HomePage setActivePage={setActivePage} isLoggedIn={isLoggedIn} openAuthModal={() => setAuthModalOpen(true)} />;
     }
@@ -241,6 +244,16 @@ const App: React.FC = () => {
                               <UserIcon className="w-5 h-5" />
                               {t('profileNav')}
                             </button>
+                             {/* Correspondent Nav Item */}
+                            {(profile?.role === 'correspondent' || profile?.role === 'admin') && (
+                                <button
+                                  onClick={() => { setActivePage(Page.Correspondent); setUserMenuOpen(false); }}
+                                  className="flex items-center gap-3 w-full text-left px-4 py-2 text-sm text-white hover:bg-marine-blue-darkest"
+                                >
+                                  <MicIcon className="w-5 h-5" />
+                                  {t('correspondentNav')}
+                                </button>
+                            )}
                             {profile?.role === 'admin' && (
                                 <button
                                   onClick={() => { setActivePage(Page.Admin); setUserMenuOpen(false); }}
