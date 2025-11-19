@@ -106,8 +106,9 @@ const App: React.FC = () => {
                 const newCount = data.filter(ann => !seenIds.includes(ann.id)).length;
                 setAnnouncementCount(newCount);
             }
-        } catch (error) {
-            console.error("Error counting announcements:", error);
+        } catch (error: any) {
+            const errorMessage = error?.message || (typeof error === 'object' ? JSON.stringify(error) : String(error));
+            console.error("Error counting announcements:", errorMessage);
         }
     };
 
@@ -136,12 +137,22 @@ const App: React.FC = () => {
     setActivePage(Page.Radio);
   };
   
-  const handleLogout = async () => {
-    // Attempt to sign out from Supabase, but proceed regardless of errors (like 'Auth session missing')
-    await supabase.auth.signOut();
+  const handleLogout = () => {
+    // 1. Attempt server-side sign out without awaiting (fire and forget)
+    // This prevents the UI from freezing if the server/network is slow.
+    supabase.auth.signOut().catch(err => console.error("Background sign out error:", err));
+    
     setUserMenuOpen(false);
-    // Force reload to clear all application state/context
-    window.location.reload();
+
+    // 2. Aggressively clear all Supabase tokens from local storage
+    Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('sb-')) {
+            localStorage.removeItem(key);
+        }
+    });
+
+    // 3. Force a hard redirect to the home page to reset all application state
+    window.location.href = '/';
   }
   
   const getUsername = () => {

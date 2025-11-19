@@ -142,22 +142,22 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ setActivePage, openAuthModal 
     }
   }
   
-  const handleLogout = async () => {
-    setLoading(true);
-    setMessage(null);
+  const handleLogout = () => {
+    // Show loading state briefly to indicate action
+    setLoading(true); 
     
-    // We attempt to sign out. Even if it fails with "Auth session missing", 
-    // it means we are technically logged out, so we should proceed to clear the state.
-    const { error } = await supabase.auth.signOut();
-    
-    if (error && !error.message.includes('session missing')) {
-        console.error('Error logging out:', error);
-        setMessage({ type: 'error', text: `Logout failed: ${error.message}` });
-        setLoading(false);
-    } else {
-        // Force a reload to ensure all states (Context, LocalStorage, Supabase client) are synced and clean
-        window.location.reload();
-    }
+    // 1. Fire and forget server signout
+    supabase.auth.signOut().catch(console.error);
+
+    // 2. Clear local storage aggressively
+    Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('sb-')) {
+            localStorage.removeItem(key);
+        }
+    });
+
+    // 3. Force redirect to root
+    window.location.href = '/';
   };
 
   const handleDeleteAccount = async () => {
