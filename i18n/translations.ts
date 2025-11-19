@@ -1,3 +1,4 @@
+
 export const translations: { [key: string]: { [key: string]: string } } = {
   en: {
     onboardingSlogan: 'The voice that unites us.',
@@ -401,6 +402,11 @@ Thank you for your support!`,
     previewMaterial: "Preview Material",
     recordingInProgress: "Recording in progress...",
     correspondentDbError: "Database not configured for correspondent materials.",
+    
+    micCameraPermissionDenied: "Access denied. Please enable microphone/camera permissions in your browser settings.",
+    micCameraNotFound: "No microphone or camera detected.",
+    micCameraInUse: "Device is in use by another application or not readable.",
+    micCameraErrorGeneric: "Error accessing media devices.",
   },
   ro: {
     onboardingSlogan: 'Vocea care ne unește.',
@@ -494,7 +500,7 @@ Thank you for your support!`,
     authSignInWithApple: 'Autentificare cu Apple',
     termsTitle: 'Termeni și Condiții',
     termsContentPlaceholder: `1. Acceptarea Termenilor
-Prin accesarea și utilizarea aplicației Radio Vocea Românilor ("RVR") ("Aplicația"), sunteți de acord să respectați acești Termeni și Condiții ("Termeni"). Dacă nu sunteți de acord cu orice parte a acestor termeni, nu puteți utiliza Aplicația în deplinătatea funcționalităților sale. Refuzul de a accepta acești termeni va limita accesul dvs. doar la funcționalitatea de streaming radio.
+Prin accesarea și utilizarea aplicației Radio Vocea Românilor ("RVR") ("Aplicația"), sunteți de acord să respectați acești Termeni și Condiții ("Termeni"). Dacă nu sunteți de acord cu orice parte a acestor termeni, nu puteți utiliza Aplicația în deplinătatea funcționalităților sale. Refusal de a accepta acești termeni va limita accesul dvs. doar la funcționalitatea de streaming radio.
 
 2. Descrierea Serviciului
 Aplicația oferă utilizatorilor acces la un flux radio în direct, articole de știri, sondaje interactive și posibilitatea de a încărca conținut generat de utilizatori (colectiv, "Serviciul"). Ne rezervăm dreptul de a modifica sau de a întrerupe Serviciul în orice moment, fără notificare prealabilă.
@@ -803,5 +809,10 @@ Vă mulțumim pentru sprijinul acordat!`,
     previewMaterial: "Previzualizare Material",
     recordingInProgress: "Înregistrare în curs...",
     correspondentDbError: "Baza de date nu este configurată pentru corespondenți.",
+
+    micCameraPermissionDenied: "Acces refuzat. Vă rugăm să activați permisiunile pentru microfon/cameră din setările browserului.",
+    micCameraNotFound: "Nu a fost detectat niciun microfon sau cameră.",
+    micCameraInUse: "Dispozitivul este utilizat de o altă aplicație sau nu poate fi citit.",
+    micCameraErrorGeneric: "Eroare la accesarea dispozitivelor media.",
   },
 };

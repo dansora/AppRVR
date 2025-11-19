@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../services/supabaseClient';
@@ -52,9 +53,15 @@ const CorrespondentPage: React.FC = () => {
   const startRecording = async () => {
     setMessage(null);
     try {
+      // Check API support
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error('Media Devices API not supported.');
+      }
+
+      // Simplified constraints to reduce compatibility issues
       const constraints = {
         audio: true,
-        video: mediaType === 'video' ? { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } } : false
+        video: mediaType === 'video' ? { facingMode: "user" } : false
       };
       
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -66,18 +73,25 @@ const CorrespondentPage: React.FC = () => {
 
       // Determine supported mime type
       let options;
-      if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) {
-        options = { mimeType: 'video/webm;codecs=vp9' };
-      } else if (MediaRecorder.isTypeSupported('video/mp4')) {
-        options = { mimeType: 'video/mp4' }; // Safari 14.1+
-      }
-      // If audio only
-      if (mediaType === 'audio') {
-         if (MediaRecorder.isTypeSupported('audio/webm')) {
-             options = { mimeType: 'audio/webm' };
-         } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
-             options = { mimeType: 'audio/mp4' };
-         }
+      const mimeTypes = [
+          'video/webm;codecs=vp9',
+          'video/webm',
+          'video/mp4',
+          'audio/webm',
+          'audio/mp4',
+          'audio/ogg',
+          'audio/wav'
+      ];
+
+      // Try to find a supported mime type if we want to be specific, 
+      // otherwise let the browser pick the default for the stream.
+      if (mediaType === 'video') {
+           if (MediaRecorder.isTypeSupported('video/mp4')) options = { mimeType: 'video/mp4' };
+           else if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) options = { mimeType: 'video/webm;codecs=vp9' };
+           else if (MediaRecorder.isTypeSupported('video/webm')) options = { mimeType: 'video/webm' };
+      } else {
+           if (MediaRecorder.isTypeSupported('audio/mp4')) options = { mimeType: 'audio/mp4' };
+           else if (MediaRecorder.isTypeSupported('audio/webm')) options = { mimeType: 'audio/webm' };
       }
 
       const mediaRecorder = new MediaRecorder(stream, options);
@@ -89,8 +103,9 @@ const CorrespondentPage: React.FC = () => {
       };
 
       mediaRecorder.onstop = () => {
-        const blobType = mediaType === 'video' ? (options?.mimeType || 'video/webm') : (options?.mimeType || 'audio/webm');
-        const blob = new Blob(chunks, { type: blobType });
+        // Create blob with the actual mime type used by the recorder
+        const finalType = mediaRecorder.mimeType || (mediaType === 'video' ? 'video/webm' : 'audio/webm');
+        const blob = new Blob(chunks, { type: finalType });
         setMediaBlob(blob);
         setMediaUrl(URL.createObjectURL(blob));
         setRecordingState('review');
@@ -108,7 +123,21 @@ const CorrespondentPage: React.FC = () => {
 
     } catch (err: any) {
       console.error("Error accessing media devices:", err);
-      setMessage({ type: 'error', text: `Could not access microphone/camera: ${err.message}. Please ensure permissions are granted.` });
+      let errorMessage = t('micCameraErrorGeneric');
+      
+      // More robust error checking
+      const errorName = err.name || 'UnknownError';
+      const errorMsg = err.message || '';
+
+      if (errorName === 'NotAllowedError' || errorName === 'PermissionDeniedError' || errorMsg.includes('denied') || errorMsg.includes('permission')) {
+          errorMessage = t('micCameraPermissionDenied');
+      } else if (errorName === 'NotFoundError' || errorName === 'DevicesNotFoundError') {
+          errorMessage = t('micCameraNotFound');
+      } else if (errorName === 'NotReadableError' || errorName === 'TrackStartError') {
+          errorMessage = t('micCameraInUse');
+      }
+      
+      setMessage({ type: 'error', text: errorMessage });
     }
   };
 
@@ -137,6 +166,14 @@ const CorrespondentPage: React.FC = () => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const getFileExtension = (mimeType: string) => {
+      if (mimeType.includes('mp4')) return 'mp4';
+      if (mimeType.includes('wav')) return 'wav';
+      if (mimeType.includes('ogg')) return 'ogg';
+      if (mimeType.includes('mpeg') || mimeType.includes('mp3')) return 'mp3';
+      return 'webm'; // Default fallback
+  };
+
   const handleSubmit = async () => {
       if (!title || !mediaBlob || !session) {
           setMessage({ type: 'error', text: 'Titlul și înregistrarea sunt obligatorii.' });
@@ -147,14 +184,16 @@ const CorrespondentPage: React.FC = () => {
       setMessage(null);
 
       try {
-          const fileExt = mediaBlob.type.includes('video') ? 'webm' : 'webm'; 
-          // Use a clearer path structure
+          const fileExt = getFileExtension(mediaBlob.type);
           const fileName = `${session.user.id}/${Date.now()}.${fileExt}`;
 
           // 1. Upload File to Bucket
           const { error: uploadError } = await supabase.storage
             .from('correspondent-materials')
-            .upload(fileName, mediaBlob);
+            .upload(fileName, mediaBlob, {
+                contentType: mediaBlob.type,
+                upsert: false
+            });
 
           if (uploadError) throw uploadError;
 
