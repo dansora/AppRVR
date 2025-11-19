@@ -137,9 +137,11 @@ const App: React.FC = () => {
   };
   
   const handleLogout = async () => {
+    // Attempt to sign out from Supabase, but proceed regardless of errors (like 'Auth session missing')
     await supabase.auth.signOut();
     setUserMenuOpen(false);
-    setActivePage(Page.Home);
+    // Force reload to clear all application state/context
+    window.location.reload();
   }
   
   const getUsername = () => {
