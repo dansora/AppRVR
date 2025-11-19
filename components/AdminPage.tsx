@@ -7,10 +7,11 @@ import UserSubmissionsManager from './admin/UserSubmissionsManager';
 import AdvertisingManager from './admin/AdvertisingManager';
 import ContestsManager from './admin/ContestsManager';
 import EventsManager from './admin/EventsManager';
+import UsersManager from './admin/UsersManager';
 
 const AdminPage: React.FC = () => {
   const { t } = useLanguage();
-  const [view, setView] = useState<'dashboard' | 'announcements' | 'polls' | 'submissions' | 'advertising' | 'contests' | 'events'>('dashboard');
+  const [view, setView] = useState<'dashboard' | 'announcements' | 'polls' | 'submissions' | 'advertising' | 'contests' | 'events' | 'users'>('dashboard');
 
   const getTitle = () => {
     switch (view) {
@@ -26,6 +27,8 @@ const AdminPage: React.FC = () => {
         return t('adminContestsPageTitle');
       case 'events':
         return t('adminEventsPageTitle');
+      case 'users':
+        return t('adminUsersPageTitle');
       case 'dashboard':
       default:
         return t('adminPanelTitle');
@@ -46,6 +49,8 @@ const AdminPage: React.FC = () => {
         return <ContestsManager onBack={() => setView('dashboard')} />;
       case 'events':
         return <EventsManager onBack={() => setView('dashboard')} />;
+      case 'users':
+        return <UsersManager onBack={() => setView('dashboard')} />;
       case 'dashboard':
       default:
         return <AdminDashboard setView={setView} />;

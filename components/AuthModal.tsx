@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
-import { CloseIcon, UserIcon, GitHubIcon, GoogleIcon, FacebookIcon, AppleIcon } from './Icons';
+import { CloseIcon, UserIcon, GoogleIcon, FacebookIcon } from './Icons';
 import { supabase } from '../services/supabaseClient';
 import type { Provider } from '@supabase/supabase-js';
 import { useModal } from '../contexts/ModalContext';
@@ -45,7 +46,6 @@ const AuthModal: React.FC<AuthModalProps> = ({ onClose }) => {
                 password,
                 options: {
                     data: {
-                        // You can add additional user metadata here
                         username: email.split('@')[0]
                     }
                 }
@@ -65,8 +65,26 @@ const AuthModal: React.FC<AuthModalProps> = ({ onClose }) => {
     setLoading(true);
     setError(null);
     setMessage(null);
+    
     try {
-        const { error } = await supabase.auth.signInWithOAuth({ provider });
+        // Configurare specifică pentru fiecare provider
+        let queryParams: { [key: string]: string } | undefined = undefined;
+        let scopes: string | undefined = undefined;
+
+        if (provider === 'facebook') {
+            // Cerem explicit email și profil public pentru Facebook
+            scopes = 'public_profile,email';
+        }
+
+        const { error } = await supabase.auth.signInWithOAuth({ 
+            provider,
+            options: {
+                // Redirecționează către pagina curentă (origin)
+                redirectTo: `${window.location.origin}/`,
+                scopes: scopes,
+                queryParams: queryParams
+            }
+        });
         if (error) throw error;
         // Supabase handles the redirect
     } catch (err: any) {
@@ -110,8 +128,8 @@ const AuthModal: React.FC<AuthModalProps> = ({ onClose }) => {
                 </div>
             </div>
 
-            {error && <div className="bg-red-500/20 text-red-300 p-3 rounded-md text-center mb-4">{error}</div>}
-            {message && <div className="bg-green-500/20 text-green-300 p-3 rounded-md text-center mb-4">{message}</div>}
+            {error && <div className="bg-red-500/20 text-red-300 p-3 rounded-md text-center mb-4 text-sm">{error}</div>}
+            {message && <div className="bg-green-500/20 text-green-300 p-3 rounded-md text-center mb-4 text-sm">{message}</div>}
 
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
@@ -134,54 +152,37 @@ const AuthModal: React.FC<AuthModalProps> = ({ onClose }) => {
                 </div>
             </form>
 
-            <div className="relative flex py-4 items-center">
+            <div className="relative flex py-6 items-center">
                 <div className="flex-grow border-t border-white/20"></div>
-                <span className="flex-shrink mx-4 text-white/70 text-sm">{t('authOr')}</span>
+                <span className="flex-shrink mx-4 text-white/50 text-xs uppercase tracking-widest">{t('authOr')}</span>
                 <div className="flex-grow border-t border-white/20"></div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3">
                 <button
                     type="button"
                     onClick={() => signInWithProvider('google')}
                     disabled={loading}
-                    className="w-full bg-white text-gray-700 font-bold py-3 rounded-full hover:bg-gray-200 transition-colors disabled:bg-gray-500 flex items-center justify-center gap-3 shadow"
+                    className="w-full bg-white text-gray-700 font-bold py-3 rounded-full hover:bg-gray-100 transition-colors disabled:bg-gray-500 flex items-center justify-center gap-3 shadow-md"
                 >
                     <GoogleIcon className="w-5 h-5" />
                     {t('authSignInWithGoogle')}
                 </button>
+                
                 <button
                     type="button"
                     onClick={() => signInWithProvider('facebook')}
                     disabled={loading}
-                    className="w-full bg-[#1877F2] text-white font-bold py-3 rounded-full hover:bg-[#166FE5] transition-colors disabled:bg-gray-500 flex items-center justify-center gap-3 shadow"
+                    className="w-full bg-[#1877F2] text-white font-bold py-3 rounded-full hover:bg-[#166FE5] transition-colors disabled:bg-gray-500 flex items-center justify-center gap-3 shadow-md"
                 >
                     <FacebookIcon className="w-5 h-5" />
                     {t('authSignInWithFacebook')}
                 </button>
-                <button
-                    type="button"
-                    onClick={() => signInWithProvider('apple')}
-                    disabled={loading}
-                    className="w-full bg-black text-white font-bold py-3 rounded-full hover:bg-gray-800 transition-colors disabled:bg-gray-500 flex items-center justify-center gap-3 shadow"
-                >
-                    <AppleIcon className="w-5 h-5" />
-                    {t('authSignInWithApple')}
-                </button>
-                <button
-                    type="button"
-                    onClick={() => signInWithProvider('github')}
-                    disabled={loading}
-                    className="w-full bg-[#333] text-white font-bold py-3 rounded-full hover:bg-[#444] transition-colors disabled:bg-gray-500 flex items-center justify-center gap-3 shadow"
-                >
-                    <GitHubIcon className="w-5 h-5" />
-                    {t('authSignInWithGitHub')}
-                </button>
             </div>
             
-            <div className="text-center text-sm text-white/70 mt-4">
+            <div className="text-center text-sm text-white/70 mt-6">
                 {mode === 'login' ? t('authNoAccount') : t('authHaveAccount')}{' '}
-                <button type="button" onClick={toggleMode} className="font-medium text-golden-yellow hover:underline">
+                <button type="button" onClick={toggleMode} className="font-bold text-golden-yellow hover:underline">
                     {mode === 'login' ? t('authSignUp') : t('authLogin')}
                 </button>
             </div>

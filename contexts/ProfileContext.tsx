@@ -11,7 +11,7 @@ export interface Profile {
   country: string | null;
   phone_number: string | null;
   avatar_url: string | null;
-  role: 'user' | 'admin' | null;
+  role: 'user' | 'admin' | 'correspondent' | 'special-user' | null;
 }
 
 interface ProfileContextType {
