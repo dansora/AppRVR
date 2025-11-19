@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../services/supabaseClient';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { BackIcon, UserIcon, EditIcon, CheckCircleIcon } from '../Icons';
+import { BackIcon, UserIcon, EditIcon } from '../Icons';
 
 interface UserProfile {
   id: string;
   username: string | null;
   first_name: string | null;
   last_name: string | null;
-  email?: string | null; // Optional as it might not exist on the profile table yet
+  email?: string | null; 
   role: 'user' | 'admin' | 'correspondent' | 'special-user' | null;
   created_at?: string;
 }
@@ -21,70 +21,85 @@ const UsersManager: React.FC<UsersManagerProps> = ({ onBack }) => {
   const { t } = useLanguage();
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<{message: string, sql?: string} | null>(null);
-  const [emailWarning, setEmailWarning] = useState<string | null>(null);
+  const [error, setError] = useState<{message: string, sql?: string, title?: string} | null>(null);
   const [editingUser, setEditingUser] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     setError(null);
-    setEmailWarning(null);
 
-    // First try to fetch with email
-    let { data, error } = await supabase
-      .from('profiles')
-      .select('id, username, first_name, last_name, email, role, created_at')
-      .order('created_at', { ascending: false });
+    try {
+        // Try to fetch with all desired columns
+        let { data, error } = await supabase
+        .from('profiles')
+        .select('id, username, first_name, last_name, email, role, created_at')
+        .order('created_at', { ascending: false });
 
-    if (error) {
-        // Check for missing email column
-        if (error.code === '42703') { // undefined_column
-            const sql = `ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS email text;
+        if (error) {
+            throw error;
+        }
 
--- Function to sync email on new user creation
+        setUsers(data as UserProfile[] || []);
+    } catch (err: any) {
+        console.error("Fetch Users Error:", err);
+
+        // Handle "column does not exist" error (code 42703)
+        if (err.code === '42703') {
+            const fixSql = `-- 1. Add missing columns to profiles table
+ALTER TABLE public.profiles 
+ADD COLUMN IF NOT EXISTS created_at timestamp with time zone DEFAULT now(),
+ADD COLUMN IF NOT EXISTS email text;
+
+-- 2. Backfill data from auth.users for existing users
+UPDATE public.profiles
+SET 
+  created_at = auth.users.created_at,
+  email = auth.users.email
+FROM auth.users
+WHERE public.profiles.id = auth.users.id;
+
+-- 3. Update the trigger to automatically save email and created_at for NEW users
 CREATE OR REPLACE FUNCTION public.handle_new_user() 
 RETURNS trigger AS $$
 BEGIN
-  INSERT INTO public.profiles (id, email, username)
-  VALUES (new.id, new.email, new.raw_user_meta_data->>'username');
+  INSERT INTO public.profiles (id, username, email, created_at, role)
+  VALUES (
+    new.id, 
+    new.raw_user_meta_data->>'username', 
+    new.email, 
+    new.created_at,
+    'user'
+  );
   RETURN new;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER;`;
 
--- Backfill existing emails (requires permission or manual run)
-UPDATE public.profiles
-SET email = au.email
-FROM auth.users au
-WHERE public.profiles.id = au.id AND public.profiles.email IS NULL;`;
-            
-            setEmailWarning(sql);
-            
-            // Retry without email column
-            const { data: retryData, error: retryError } = await supabase
-                .from('profiles')
-                .select('id, username, first_name, last_name, role, created_at')
-                .order('created_at', { ascending: false });
-            
-            if (retryError) {
-                setError({ message: `${t('dbErrorUsers')}: ${retryError.message}` });
-            } else {
-                setUsers(retryData as UserProfile[] || []);
-            }
-        } else if (error.code === '42501') { // permission denied (RLS)
+            setError({ 
+                title: "Database Update Required",
+                message: "The 'profiles' table is missing the 'created_at' or 'email' columns. Please run this SQL script to fix the schema and sync existing user data:",
+                sql: fixSql 
+            });
+        } 
+        // Handle Permission Denied (RLS) - code 42501
+        else if (err.code === '42501') {
              const sql = `CREATE POLICY "Allow admins to view all profiles"
 ON public.profiles
 FOR SELECT
 TO authenticated
 USING ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin'::text);`;
-             setError({ message: t('dbErrorUsers'), sql });
-        } else {
-            setError({ message: error.message });
+             setError({ 
+                 title: t('dbErrorUsers'), 
+                 message: t('dbErrorUsersInstruction'),
+                 sql: sql 
+            });
+        } 
+        else {
+            setError({ message: err.message || "An unexpected error occurred." });
         }
-    } else {
-        setUsers(data as UserProfile[] || []);
+    } finally {
+        setLoading(false);
     }
-    setLoading(false);
   }, [t]);
 
   useEffect(() => {
@@ -141,85 +156,77 @@ USING ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin'::text)
 
         {/* Error handling with SQL instructions */}
         {error && (
-            <div className="bg-red-500/20 text-red-300 p-4 rounded-lg space-y-2">
-                <p className="font-bold">{error.message}</p>
+            <div className="bg-marine-blue-darker border-l-4 border-golden-yellow p-6 rounded-lg space-y-4 shadow-lg">
+                <h3 className="text-xl font-bold text-golden-yellow">{error.title || "Error"}</h3>
+                <p className="text-white/90">{error.message}</p>
                 {error.sql && (
-                    <>
-                        <p className="text-sm">{t('dbErrorUsersInstruction')}</p>
-                        <pre className="bg-marine-blue-darkest p-2 rounded-md text-xs text-white/90 overflow-x-auto">
+                    <div className="relative">
+                        <pre className="bg-marine-blue-darkest p-4 rounded-md text-xs text-green-300 overflow-x-auto font-mono border border-white/10">
                             <code>{error.sql}</code>
                         </pre>
-                    </>
+                        <p className="text-xs text-white/50 mt-2">Copy and run this in your Supabase SQL Editor.</p>
+                    </div>
                 )}
             </div>
         )}
 
-        {/* Warning for missing email column */}
-        {!error && emailWarning && (
-            <div className="bg-blue-900/50 border border-blue-600 p-4 rounded-lg text-sm">
-                <p className="font-bold text-blue-300 mb-2">{t('dbEmailMissing')}</p>
-                <p className="text-blue-300/90 mb-2">{t('dbEmailInstruction')}</p>
-                <pre className="bg-marine-blue-darkest p-2 rounded-md text-xs text-white/90 overflow-x-auto">
-                    <code>{emailWarning}</code>
-                </pre>
-            </div>
-        )}
-
-        <div className="bg-marine-blue-darker p-6 rounded-lg shadow-md">
-            <h2 className="text-xl font-montserrat mb-4 text-golden-yellow">{t('adminUsersPageTitle')}</h2>
-            {loading ? <p>{t('newsLoading')}</p> : users.length === 0 && !error ? <p>No users found.</p> : (
-                <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-                    {users.map(user => (
-                        <div key={user.id} className="bg-marine-blue-darkest/50 p-4 rounded-lg border border-white/10 relative">
-                            <div className="flex items-start justify-between mb-2">
-                                <div className="flex items-center gap-2">
-                                    <UserIcon className="w-8 h-8 text-white/70" />
-                                    <div>
-                                        <p className="font-bold text-white truncate max-w-[150px]" title={user.username || 'N/A'}>{user.username || 'N/A'}</p>
-                                        <p className="text-xs text-white/50">
-                                            {user.first_name} {user.last_name}
-                                        </p>
+        {!error && (
+            <div className="bg-marine-blue-darker p-6 rounded-lg shadow-md">
+                <h2 className="text-xl font-montserrat mb-4 text-golden-yellow">{t('adminUsersPageTitle')}</h2>
+                {loading ? <p>{t('newsLoading')}</p> : users.length === 0 ? <p>No users found.</p> : (
+                    <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+                        {users.map(user => (
+                            <div key={user.id} className="bg-marine-blue-darkest/50 p-4 rounded-lg border border-white/10 relative flex flex-col h-full">
+                                <div className="flex items-start justify-between mb-2">
+                                    <div className="flex items-center gap-2">
+                                        <UserIcon className="w-8 h-8 text-white/70" />
+                                        <div>
+                                            <p className="font-bold text-white truncate max-w-[150px]" title={user.username || 'N/A'}>{user.username || 'N/A'}</p>
+                                            <p className="text-xs text-white/50">
+                                                {user.first_name} {user.last_name}
+                                            </p>
+                                        </div>
                                     </div>
+                                    {editingUser !== user.id && (
+                                        <button onClick={() => setEditingUser(user.id)} className="p-2 text-white/70 hover:text-white">
+                                            <EditIcon className="w-5 h-5" />
+                                        </button>
+                                    )}
                                 </div>
-                                {editingUser !== user.id && (
-                                    <button onClick={() => setEditingUser(user.id)} className="p-2 text-white/70 hover:text-white">
-                                        <EditIcon className="w-5 h-5" />
-                                    </button>
+                                
+                                <div className="text-sm text-white/80 mb-3 space-y-1 flex-grow">
+                                    {user.email && <p className="truncate" title={user.email}>{user.email}</p>}
+                                    <p className="text-xs text-white/50">{t('joinedOn')} {user.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}</p>
+                                </div>
+
+                                {editingUser === user.id ? (
+                                    <div className="mt-auto space-y-2 bg-marine-blue-darker p-2 rounded-md">
+                                        <label className="text-xs text-white/70 uppercase">{t('updateRole')}</label>
+                                        <select 
+                                            defaultValue={user.role || 'user'} 
+                                            onChange={(e) => handleRoleChange(user.id, e.target.value)}
+                                            className="w-full bg-marine-blue-darkest text-white p-2 rounded-md text-sm focus:ring-1 focus:ring-golden-yellow outline-none"
+                                        >
+                                            <option value="user">{t('roleUser')}</option>
+                                            <option value="correspondent">{t('roleCorrespondent')}</option>
+                                            <option value="special-user">{t('roleSpecialUser')}</option>
+                                            <option value="admin">{t('roleAdmin')}</option>
+                                        </select>
+                                        <button onClick={() => setEditingUser(null)} className="w-full text-xs text-white/50 hover:text-white mt-1 underline">Cancel</button>
+                                    </div>
+                                ) : (
+                                    <div className="mt-auto pt-2 border-t border-white/10">
+                                        <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold text-white ${getRoleColor(user.role)}`}>
+                                            {getRoleLabel(user.role)}
+                                        </span>
+                                    </div>
                                 )}
                             </div>
-                            
-                            <div className="text-sm text-white/80 mb-3 space-y-1">
-                                {user.email && <p className="truncate" title={user.email}>{user.email}</p>}
-                                <p className="text-xs text-white/50">{t('joinedOn')} {user.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}</p>
-                            </div>
-
-                            {editingUser === user.id ? (
-                                <div className="mt-2 space-y-2 bg-marine-blue-darker p-2 rounded-md">
-                                    <label className="text-xs text-white/70 uppercase">{t('updateRole')}</label>
-                                    <select 
-                                        defaultValue={user.role || 'user'} 
-                                        onChange={(e) => handleRoleChange(user.id, e.target.value)}
-                                        className="w-full bg-marine-blue-darkest text-white p-2 rounded-md text-sm"
-                                    >
-                                        <option value="user">{t('roleUser')}</option>
-                                        <option value="correspondent">{t('roleCorrespondent')}</option>
-                                        <option value="special-user">{t('roleSpecialUser')}</option>
-                                        <option value="admin">{t('roleAdmin')}</option>
-                                    </select>
-                                    <button onClick={() => setEditingUser(null)} className="w-full text-xs text-white/50 hover:text-white mt-1 underline">Cancel</button>
-                                </div>
-                            ) : (
-                                <div className="mt-2">
-                                    <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold text-white ${getRoleColor(user.role)}`}>
-                                        {getRoleLabel(user.role)}
-                                    </span>
-                                </div>
-                            )}
-                        </div>
-                    ))}
-                </div>
-            )}
-        </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        )}
     </div>
   );
 };
