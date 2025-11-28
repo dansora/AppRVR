@@ -1,9 +1,11 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useProfile } from '../contexts/ProfileContext';
 import { Page } from '../types';
 import { TrophyIcon } from './Icons';
+import DetailModal from './DetailModal';
 
 interface ActiveContestSlide {
   type: 'active';
@@ -11,6 +13,8 @@ interface ActiveContestSlide {
   title: string;
   prizes: string | null;
   image_url: string | null;
+  description?: string;
+  end_date?: string;
 }
 
 interface UpcomingContestSlide {
@@ -20,6 +24,7 @@ interface UpcomingContestSlide {
   prizes: string | null;
   image_url: string | null;
   start_date: string;
+  description?: string;
 }
 
 interface Winner {
@@ -45,6 +50,7 @@ const ContestCarousel: React.FC<ContestCarouselProps> = ({ setActivePage, openAu
   const [slides, setSlides] = useState<CarouselSlide[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [selectedSlide, setSelectedSlide] = useState<CarouselSlide | null>(null);
 
   useEffect(() => {
     const fetchContestData = async () => {
@@ -52,10 +58,9 @@ const ContestCarousel: React.FC<ContestCarouselProps> = ({ setActivePage, openAu
       const now = new Date().toISOString();
       const finalSlides: CarouselSlide[] = [];
 
-      // Fetch active and upcoming contests in one go
       const { data: futureContests, error: futureError } = await supabase
         .from('contests')
-        .select('id, title, prizes, image_url, start_date, end_date')
+        .select('id, title, prizes, image_url, start_date, end_date, description')
         .eq('is_active', true)
         .gte('end_date', now)
         .order('start_date', { ascending: true });
@@ -65,16 +70,13 @@ const ContestCarousel: React.FC<ContestCarouselProps> = ({ setActivePage, openAu
       const activeContests = futureContests?.filter(c => c.start_date <= now) || [];
       const upcomingContests = futureContests?.filter(c => c.start_date > now) || [];
 
-      // Add all active contests
       if (activeContests.length > 0) {
         finalSlides.push(...activeContests.map(c => ({ ...c, type: 'active' as const })));
       } 
-      // If no active contests, add the single next upcoming one
       else if (upcomingContests.length > 0) {
         finalSlides.push({ ...upcomingContests[0], type: 'upcoming' as const });
       }
 
-      // Fetch up to 3 most recent past contests that have winners
       const { data: pastContests, error: pastError } = await supabase
         .from('contests')
         .select('id, title')
@@ -113,16 +115,17 @@ const ContestCarousel: React.FC<ContestCarouselProps> = ({ setActivePage, openAu
   }, []);
 
   useEffect(() => {
-    if (slides.length > 1) {
+    if (slides.length > 1 && !selectedSlide) {
       const timer = setTimeout(() => {
         setCurrentIndex((prevIndex) => (prevIndex + 1) % slides.length);
-      }, 10000); // 10 seconds
+      }, 10000); 
 
       return () => clearTimeout(timer);
     }
-  }, [currentIndex, slides.length]);
+  }, [currentIndex, slides.length, selectedSlide]);
 
   const handleParticipateClick = () => {
+      setSelectedSlide(null); // Close modal first
       if (session) {
           setActivePage(Page.Upload);
       } else {
@@ -140,19 +143,16 @@ const ContestCarousel: React.FC<ContestCarouselProps> = ({ setActivePage, openAu
             return (
                 <div className="flex items-center gap-4">
                     {slide.image_url && 
-                        <div className="w-1/4 flex-shrink-0">
+                        <div className="w-1/3 flex-shrink-0">
                             <img src={slide.image_url} alt={slide.title} className="w-full rounded-md object-cover aspect-square" />
                         </div>
                     }
                     <div className="flex-1">
-                        <h3 className="text-lg font-bold font-montserrat text-golden-yellow mb-2">{slide.title}</h3>
+                        <h3 className="text-lg font-bold font-montserrat text-golden-yellow mb-2 line-clamp-2">{slide.title}</h3>
                         {slide.prizes && (
-                            <p className="text-white/80 text-sm whitespace-pre-wrap mb-4"><span className="font-semibold">{t('prizes')}:</span> {slide.prizes}</p>
+                            <p className="text-white/80 text-sm mb-4 line-clamp-2"><span className="font-semibold">{t('prizes')}:</span> {slide.prizes}</p>
                         )}
-                        <button
-                            onClick={handleParticipateClick}
-                            className="bg-golden-yellow text-marine-blue font-bold py-2 px-6 rounded-full hover:bg-yellow-400 transition-colors text-sm"
-                        >
+                        <button className="text-golden-yellow text-sm font-bold underline">
                             {t('participateNow')}
                         </button>
                     </div>
@@ -162,14 +162,14 @@ const ContestCarousel: React.FC<ContestCarouselProps> = ({ setActivePage, openAu
             return (
                 <div className="flex items-center gap-4">
                     {slide.image_url && 
-                        <div className="w-1/4 flex-shrink-0">
+                        <div className="w-1/3 flex-shrink-0">
                             <img src={slide.image_url} alt={slide.title} className="w-full rounded-md object-cover aspect-square" />
                         </div>
                     }
                     <div className="flex-1">
                         <p className="text-sm font-bold text-golden-yellow mb-2">{t('comingSoon')}</p>
-                        <h3 className="text-lg font-bold font-montserrat text-white mb-2">{slide.title}</h3>
-                        <p className="text-white/80 text-xs">{t('pollStartsOn', { date: new Date(slide.start_date).toLocaleString() })}</p>
+                        <h3 className="text-lg font-bold font-montserrat text-white mb-2 line-clamp-2">{slide.title}</h3>
+                        <p className="text-white/80 text-xs">{t('pollStartsOn', { date: new Date(slide.start_date).toLocaleDateString() })}</p>
                     </div>
                 </div>
             );
@@ -185,39 +185,63 @@ const ContestCarousel: React.FC<ContestCarouselProps> = ({ setActivePage, openAu
       }
   };
 
-  return (
-    <div>
-      <h3 className="text-xl font-montserrat text-white mb-4">{t('contestsCarouselTitle')}</h3>
-      <div className="relative w-full rounded-lg shadow-lg overflow-hidden">
-        <div
-          className="flex transition-transform duration-700 ease-in-out"
-          style={{ transform: `translateX(-${currentIndex * 100}%)` }}
-        >
-          {slides.map((slide, index) => (
-            <div key={index} className="w-full flex-shrink-0">
-                <div className="bg-marine-blue-darker p-4 rounded-lg shadow-lg border-l-4 border-golden-yellow min-h-[172px] flex flex-col justify-center">
-                    {renderSlide(slide)}
-                </div>
-            </div>
-          ))}
-        </div>
+  const getModalContent = () => {
+      if (!selectedSlide) return null;
+      if (selectedSlide.type === 'past') return null; // No modal for past winners
 
-        {slides.length > 1 && (
-            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex space-x-2">
-            {slides.map((_, index) => (
-                <button
-                key={index}
-                onClick={() => setCurrentIndex(index)}
-                className={`w-2 h-2 rounded-full transition-colors ${
-                    currentIndex === index ? 'bg-golden-yellow' : 'bg-white/50 hover:bg-white'
-                }`}
-                aria-label={`Go to slide ${index + 1}`}
-                />
+      return (
+          <DetailModal
+            title={selectedSlide.title}
+            content={selectedSlide.description}
+            imageUrl={selectedSlide.image_url}
+            actionLabel={selectedSlide.type === 'active' ? t('participateNow') : undefined}
+            onAction={selectedSlide.type === 'active' ? handleParticipateClick : undefined}
+            onClose={() => setSelectedSlide(null)}
+            extraInfo={selectedSlide.prizes ? <p className="font-bold text-golden-yellow">{t('prizes')}: <span className="text-white font-normal">{selectedSlide.prizes}</span></p> : null}
+            date={selectedSlide.type === 'upcoming' ? t('pollStartsOn', { date: new Date(selectedSlide.start_date).toLocaleString() }) : t('contestEndsOn', { date: new Date(selectedSlide.end_date!).toLocaleString() })}
+          />
+      );
+  };
+
+  return (
+    <>
+        <div>
+        <h3 className="text-xl font-montserrat text-white mb-4">{t('contestsCarouselTitle')}</h3>
+        <div className="relative w-full rounded-lg shadow-lg overflow-hidden">
+            <div
+            className="flex transition-transform duration-700 ease-in-out"
+            style={{ transform: `translateX(-${currentIndex * 100}%)` }}
+            >
+            {slides.map((slide, index) => (
+                <div key={index} className="w-full flex-shrink-0">
+                    <div 
+                        onClick={() => slide.type !== 'past' && setSelectedSlide(slide)}
+                        className={`bg-marine-blue-darker p-4 rounded-lg shadow-lg border-l-4 border-golden-yellow min-h-[172px] flex flex-col justify-center transition-colors ${slide.type !== 'past' ? 'cursor-pointer hover:bg-marine-blue-darkest' : ''}`}
+                    >
+                        {renderSlide(slide)}
+                    </div>
+                </div>
             ))}
             </div>
-        )}
-      </div>
-    </div>
+
+            {slides.length > 1 && (
+                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex space-x-2">
+                {slides.map((_, index) => (
+                    <button
+                    key={index}
+                    onClick={() => setCurrentIndex(index)}
+                    className={`w-2 h-2 rounded-full transition-colors ${
+                        currentIndex === index ? 'bg-golden-yellow' : 'bg-white/50 hover:bg-white'
+                    }`}
+                    aria-label={`Go to slide ${index + 1}`}
+                    />
+                ))}
+                </div>
+            )}
+        </div>
+        </div>
+        {getModalContent()}
+    </>
   );
 };
 

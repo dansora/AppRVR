@@ -1,7 +1,9 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { useLanguage } from '../contexts/LanguageContext';
 import { ChevronRightIcon } from './Icons';
+import DetailModal from './DetailModal';
 
 interface Event {
   id: number;
@@ -19,6 +21,7 @@ const EventsPage: React.FC = () => {
   const [pastEvents, setPastEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
 
   useEffect(() => {
     const fetchEvents = async () => {
@@ -54,27 +57,24 @@ const EventsPage: React.FC = () => {
   }, [t]);
 
   const EventCard: React.FC<{ event: Event }> = ({ event }) => (
-    <div className="bg-marine-blue-darker rounded-lg shadow-lg overflow-hidden">
+    <div 
+        onClick={() => setSelectedEvent(event)}
+        className="bg-marine-blue-darker p-4 rounded-lg shadow-lg border-l-4 border-golden-yellow flex items-center gap-4 cursor-pointer hover:bg-marine-blue-darkest transition-colors min-h-[172px]"
+    >
       {event.image_url && (
-        <img src={event.image_url} alt={event.title} className="w-full h-48 object-cover" />
-      )}
-      <div className="p-4">
-        <h3 className="text-xl font-bold font-montserrat text-golden-yellow mb-2">{event.title}</h3>
-        <div className="text-xs text-white/70 mb-2">
-            <span>{new Date(event.start_date).toLocaleString()}</span> - <span>{new Date(event.end_date).toLocaleString()}</span>
+        <div className="w-1/3 flex-shrink-0">
+            <img src={event.image_url} alt={event.title} className="w-full rounded-md object-cover aspect-square" />
         </div>
-        {event.description && <p className="text-white/80 text-sm mb-4 whitespace-pre-wrap">{event.description}</p>}
-        {event.link_url && (
-          <a
-            href={event.link_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 bg-golden-yellow text-marine-blue font-bold py-2 px-4 rounded-full hover:bg-yellow-400 transition-colors text-sm"
-          >
-            {t('viewEvent')}
-            <ChevronRightIcon className="w-5 h-5" />
-          </a>
-        )}
+      )}
+      <div className="flex-1">
+        <h3 className="text-xl font-bold font-montserrat text-golden-yellow mb-2 line-clamp-2">{event.title}</h3>
+        <div className="text-xs text-white/70 mb-2">
+            <span>{new Date(event.start_date).toLocaleDateString()}</span> - <span>{new Date(event.end_date).toLocaleDateString()}</span>
+        </div>
+        {event.description && <p className="text-white/80 text-sm line-clamp-3">{event.description}</p>}
+        <div className="mt-2 text-golden-yellow text-xs font-bold flex items-center gap-1">
+            {t('viewEvent')} <ChevronRightIcon className="w-4 h-4" />
+        </div>
       </div>
     </div>
   );
@@ -103,6 +103,18 @@ const EventsPage: React.FC = () => {
             ) : <p className="text-white/70">{t('noPastEvents')}</p>}
           </div>
         </div>
+      )}
+
+      {selectedEvent && (
+        <DetailModal
+            title={selectedEvent.title}
+            content={selectedEvent.description}
+            imageUrl={selectedEvent.image_url}
+            date={`${new Date(selectedEvent.start_date).toLocaleString()} - ${new Date(selectedEvent.end_date).toLocaleString()}`}
+            actionLabel={selectedEvent.link_url ? t('viewEvent') : undefined}
+            onAction={selectedEvent.link_url ? () => window.open(selectedEvent.link_url!, '_blank') : undefined}
+            onClose={() => setSelectedEvent(null)}
+        />
       )}
     </div>
   );

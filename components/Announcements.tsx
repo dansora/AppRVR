@@ -1,8 +1,10 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { useLanguage } from '../contexts/LanguageContext';
 import { InfoIcon } from './Icons';
 import AnnouncementCard from './AnnouncementCard';
+import DetailModal from './DetailModal';
 
 interface Announcement {
   id: number;
@@ -21,6 +23,7 @@ const Announcements: React.FC<AnnouncementsProps> = ({ userId }) => {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
 
   useEffect(() => {
     const fetchAnnouncements = async () => {
@@ -95,23 +98,39 @@ const Announcements: React.FC<AnnouncementsProps> = ({ userId }) => {
   }
 
   return (
-    <div className="bg-marine-blue-darker p-6 rounded-lg shadow-md">
-      <h2 className="text-xl font-montserrat mb-4 text-golden-yellow flex items-center gap-2">
-        <InfoIcon className="w-6 h-6" />
-        {t('announcementsTitle')}
-      </h2>
-      <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
-        {announcements.map(ann => (
-          <AnnouncementCard key={ann.id} announcement={ann}>
-             <p className="text-xs text-white/50 mt-2 text-right w-full">
-              {new Date(ann.created_at).toLocaleDateString(undefined, {
-                year: 'numeric', month: 'long', day: 'numeric'
-              })}
-            </p>
-          </AnnouncementCard>
-        ))}
-      </div>
-    </div>
+    <>
+        <div className="bg-marine-blue-darker p-6 rounded-lg shadow-md">
+        <h2 className="text-xl font-montserrat mb-4 text-golden-yellow flex items-center gap-2">
+            <InfoIcon className="w-6 h-6" />
+            {t('announcementsTitle')}
+        </h2>
+        <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
+            {announcements.map(ann => (
+            <AnnouncementCard 
+                key={ann.id} 
+                announcement={ann}
+                onClick={() => setSelectedAnnouncement(ann)}
+            >
+                <p className="text-xs text-white/50 mt-2 text-right w-full">
+                {new Date(ann.created_at).toLocaleDateString(undefined, {
+                    year: 'numeric', month: 'long', day: 'numeric'
+                })}
+                </p>
+            </AnnouncementCard>
+            ))}
+        </div>
+        </div>
+
+        {selectedAnnouncement && (
+            <DetailModal
+                title={selectedAnnouncement.title}
+                content={selectedAnnouncement.content}
+                imageUrl={selectedAnnouncement.image_url}
+                date={new Date(selectedAnnouncement.created_at).toLocaleDateString()}
+                onClose={() => setSelectedAnnouncement(null)}
+            />
+        )}
+    </>
   );
 };
 
