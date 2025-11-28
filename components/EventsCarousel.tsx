@@ -8,6 +8,7 @@ import { Page } from '../types';
 interface Event {
   id: number;
   title: string;
+  description: string | null;
   image_url: string | null;
   start_date: string;
   end_date: string;
@@ -31,7 +32,7 @@ const EventsCarousel: React.FC<EventsCarouselProps> = ({ setActivePage }) => {
       // Fetch events that are active and not ended yet
       const { data, error } = await supabase
         .from('events')
-        .select('id, title, image_url, start_date, end_date')
+        .select('id, title, description, image_url, start_date, end_date')
         .eq('is_active', true)
         .gte('end_date', now)
         .order('start_date', { ascending: true })
@@ -79,17 +80,17 @@ const EventsCarousel: React.FC<EventsCarouselProps> = ({ setActivePage }) => {
         >
           {events.map((event) => (
             <div key={event.id} className="w-full flex-shrink-0">
-                <div className="bg-marine-blue-darker p-4 rounded-lg shadow-lg border-l-4 border-golden-yellow min-h-[140px] flex items-center gap-4">
+                <div className="bg-marine-blue-darker p-4 rounded-lg shadow-lg border-l-4 border-golden-yellow min-h-[172px] flex items-center gap-4">
                     {event.image_url && (
-                        <div className="w-1/3 flex-shrink-0">
-                            <img src={event.image_url} alt={event.title} className="w-full h-24 object-cover rounded-md" />
+                        <div className="w-1/4 flex-shrink-0">
+                            <img src={event.image_url} alt={event.title} className="w-full rounded-md object-cover aspect-square" />
                         </div>
                     )}
                     <div className="flex-1">
                         <h4 className="text-lg font-bold font-montserrat text-white mb-1 line-clamp-2">{event.title}</h4>
-                        <div className="text-xs text-white/70">
-                            <p>{new Date(event.start_date).toLocaleDateString()} - {new Date(event.end_date).toLocaleDateString()}</p>
-                        </div>
+                        <p className="text-xs text-white/80 line-clamp-3">
+                            {event.description}
+                        </p>
                         <div className="mt-2 text-golden-yellow text-xs font-bold flex items-center gap-1 group-hover:underline">
                             {t('viewEvent')} <ChevronRightIcon className="w-4 h-4" />
                         </div>
