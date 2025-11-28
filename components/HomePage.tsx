@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Page } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -9,6 +10,7 @@ import { supabase } from '../services/supabaseClient';
 import AnnouncementCard from './AnnouncementCard';
 import AdCarousel from './AdCarousel';
 import ContestCarousel from './ContestCarousel';
+import EventsCarousel from './EventsCarousel';
 
 interface HomePageProps {
   setActivePage: (page: Page) => void;
@@ -95,6 +97,10 @@ const HomePage: React.FC<HomePageProps> = ({ setActivePage, isLoggedIn, openAuth
 
       <div className="mb-8">
         <AdCarousel />
+      </div>
+
+      <div className="mb-8">
+        <EventsCarousel setActivePage={setActivePage} />
       </div>
 
       <div className="mb-8">
